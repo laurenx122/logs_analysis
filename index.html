@@ -3,713 +3,1358 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SignSpeak — Dynamic Session Analysis</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<title>SignSpeak · Gesture Sequence Validator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;--accent:#38bdf8;--accent2:#a78bfa;--accent3:#34d399;--accent4:#fb923c;--warn:#fbbf24;--danger:#f87171;--text:#e2e8f0;--muted:#64748b;--glow:0 0 0 1px var(--border),0 4px 24px rgba(56,189,248,0.06);}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh;overflow-x:hidden;}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(56,189,248,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
-.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:40px 24px 80px;}
-header{margin-bottom:40px;border-bottom:1px solid var(--border);padding-bottom:28px;}
-.tag{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-.tag::before{content:'';display:inline-block;width:20px;height:1px;background:var(--accent);}
-h1{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,46px);font-weight:800;line-height:1.1;color:#fff;letter-spacing:-1px;}
-h1 span{color:var(--accent);}
-.sub-h{color:var(--muted);font-size:12px;margin-top:6px;}
-.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;transition:border-color .2s,background .2s;cursor:pointer;position:relative;}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(56,189,248,.04);}
-.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-.upload-icon{font-size:28px;margin-bottom:10px;}
-.upload-label{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:6px;}
-.upload-hint{font-size:11px;color:var(--muted);}
-.file-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:center;}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:99px;font-size:11px;color:var(--accent);}
-.chip .rm{cursor:pointer;opacity:.6;font-size:10px;margin-left:2px;transition:opacity .15s;}
-.chip .rm:hover{opacity:1;}
-#no-data{text-align:center;padding:60px 20px;color:var(--muted);}
-#no-data .nd-icon{font-size:44px;margin-bottom:14px;}
-#no-data .nd-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:32px;}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden;box-shadow:var(--glow);transition:border-color .2s;}
-.stat:hover{border-color:var(--accent);}
-.stat .lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.stat .val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1;}
-.stat .val span{font-size:16px;}
-.stat .info{font-size:10px;color:var(--muted);margin-top:5px;}
-.stat .bar{position:absolute;bottom:0;left:0;height:3px;width:100%;}
-.sec-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:#fff;margin:32px 0 18px;display:flex;align-items:center;gap:10px;}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
-.dot.p{background:var(--accent2);}.dot.g{background:var(--accent3);}.dot.o{background:var(--accent4);}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
-@media(max-width:900px){.g2{grid-template-columns:1fr;}}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:var(--glow);display:flex;flex-direction:column;}
-.card-title{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
-.cw{position:relative;height:240px;}.cw.tall{height:300px;}
-.bm{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
-.bm-item{display:flex;align-items:center;gap:5px;font-size:10px;}
-.bm-d{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
-.opt{background:#34d399;}.mrg{background:#fbbf24;}.risk{background:#f87171;}.neu{background:#38bdf8;}
-.bm-lbl{color:var(--muted);}.bm-lbl b{color:var(--text);font-weight:500;}
-.concl{margin-top:14px;padding:14px 16px;background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:11px;line-height:1.8;color:#94a3b8;}
-.concl b{color:var(--text);}
-.verdict{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:99px;margin-bottom:8px;font-weight:600;}
-.v-pass{background:rgba(52,211,153,.15);color:#34d399;}.v-part{background:rgba(251,191,36,.15);color:#fbbf24;}.v-flag{background:rgba(248,113,113,.15);color:#f87171;}
-.cb-wrap{margin-bottom:8px;}
-.cb-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;align-items:center;}
-.cb-track{height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;}
-.cb-fill{height:100%;border-radius:99px;}
-.ztag{font-size:9px;padding:1px 7px;border-radius:99px;margin-left:5px;}
-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-th{text-align:left;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);}
-td{padding:9px 10px;border-bottom:1px solid rgba(30,45,69,.5);vertical-align:top;}
-tr:last-child td{border-bottom:none;}
-tr:hover td{background:rgba(56,189,248,.03);}
-.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:500;}
-.b-bl{background:rgba(56,189,248,.12);color:var(--accent);}.b-gn{background:rgba(52,211,153,.12);color:var(--accent3);}.b-wn{background:rgba(251,191,36,.12);color:var(--warn);}.b-rd{background:rgba(248,113,113,.12);color:#f87171;}
-.obs-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px;margin-bottom:18px;}
-.obs-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;margin-bottom:14px;}
-.obs-list{display:flex;flex-direction:column;gap:10px;}
-.obs-item{display:flex;gap:10px;align-items:flex-start;}
-.obs-icon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px;}
-.obs-text{font-size:11.5px;line-height:1.7;color:var(--text);}.obs-text b{color:var(--accent);}
-.scroll-body{max-height:380px;overflow-y:auto;padding-right:4px;}
-.scroll-body::-webkit-scrollbar{width:4px;}.scroll-body::-webkit-scrollbar-track{background:var(--surface2);}.scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-.filter-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
-.fl-label{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);}
-.date-btn{padding:5px 13px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
-.date-btn:hover{border-color:var(--accent);color:var(--text);}
-.date-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);}
-.date-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;}
-.session-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
-.s-pill{padding:5px 13px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
-.s-pill:hover{border-color:var(--accent2);color:var(--text);}
-.s-pill.active{background:rgba(167,139,250,.12);border-color:var(--accent2);color:var(--accent2);}
-.s-pill.all-pill{border-color:rgba(56,189,248,.4);color:var(--accent);}
-.s-pill.all-pill.active{background:rgba(56,189,248,.12);}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:22px;}
-.info-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;}
-.info-row .k{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
-.info-row .v{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:#fff;}
-footer{text-align:center;padding-top:32px;border-top:1px solid var(--border);color:var(--muted);font-size:10px;margin-top:40px;}
-footer span{color:var(--accent);}
+:root {
+  --bg: #07080d;
+  --surface: #0e1118;
+  --surface2: #141824;
+  --surface3: #1c2232;
+  --border: #1f2a3d;
+  --border2: #263347;
+  --accent: #4f9eff;
+  --accent-dim: rgba(79,158,255,0.12);
+  --green: #3ecf8e;
+  --green-dim: rgba(62,207,142,0.12);
+  --yellow: #f5c842;
+  --yellow-dim: rgba(245,200,66,0.12);
+  --red: #ff5c5c;
+  --red-dim: rgba(255,92,92,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --text: #e8edf5;
+  --text2: #8896b0;
+  --text3: #4a5568;
+  --glow-blue: 0 0 24px rgba(79,158,255,0.15);
+  --glow-green: 0 0 24px rgba(62,207,142,0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(79,158,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,158,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Radial glow */
+body::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(79,158,255,0.05) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 48px 28px 100px;
+}
+
+/* HEADER */
+header {
+  margin-bottom: 48px;
+}
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 28px;
+  height: 1px;
+  background: var(--accent);
+}
+
+h1 {
+  font-size: clamp(28px, 5vw, 52px);
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  line-height: 1.05;
+  color: #fff;
+}
+
+h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.sub {
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.7;
+  max-width: 640px;
+}
+
+/* LAYOUT */
+.two-col {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+
+/* PANEL */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.panel-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface2);
+}
+
+.panel-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.panel-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(79,158,255,0.2);
+}
+
+.panel-body {
+  padding: 16px;
+}
+
+/* UPLOAD ZONE */
+.upload-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.upload-zone:hover, .upload-zone.drag {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.upload-zone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.upload-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.loaded-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.loaded-file .fname {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loaded-file .rm {
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 11px;
+  transition: color .15s;
+}
+.loaded-file .rm:hover { color: var(--red); }
+
+/* GESTURE LIST (left panel) */
+.gesture-list {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.gesture-list::-webkit-scrollbar { width: 4px; }
+.gesture-list::-webkit-scrollbar-track { background: var(--surface2); }
+.gesture-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.gesture-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: background .15s, border-color .15s;
+}
+
+.gesture-item:hover {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.gesture-item.g-pass { border-color: rgba(62,207,142,.2); background: rgba(62,207,142,.04); }
+.gesture-item.g-warn { border-color: rgba(245,200,66,.2); background: rgba(245,200,66,.04); }
+.gesture-item.g-fail { border-color: rgba(255,92,92,.2); background: rgba(255,92,92,.04); }
+.gesture-item.g-none { opacity: .45; }
+
+.g-idx {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.g-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--border2);
+}
+.g-pass .g-dot { background: var(--green); box-shadow: 0 0 6px rgba(62,207,142,.5); }
+.g-warn .g-dot { background: var(--yellow); box-shadow: 0 0 6px rgba(245,200,66,.5); }
+.g-fail .g-dot { background: var(--red); box-shadow: 0 0 6px rgba(255,92,92,.5); }
+
+.g-info { flex: 1; min-width: 0; }
+
+.g-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.g-cat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.g-stats {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text2);
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.g-conf-bar {
+  margin-top: 4px;
+  height: 2px;
+  background: var(--surface3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.g-conf-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width .4s ease;
+}
+
+.rep-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--surface3);
+  color: var(--text3);
+}
+.rep-tag.good { background: var(--green-dim); color: var(--green); }
+.rep-tag.warn { background: var(--yellow-dim); color: var(--yellow); }
+.rep-tag.fail { background: var(--red-dim); color: var(--red); }
+
+/* CATEGORY SEPARATOR */
+.cat-sep {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 10px 12px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* MAIN CONTENT */
+.section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.section-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.section-title .dot.g { background: var(--green); }
+.section-title .dot.y { background: var(--yellow); }
+.section-title .dot.r { background: var(--red); }
+
+/* STAT CARDS */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.stat-card.c-blue::before { background: linear-gradient(90deg, var(--accent), transparent); }
+.stat-card.c-green::before { background: linear-gradient(90deg, var(--green), transparent); }
+.stat-card.c-yellow::before { background: linear-gradient(90deg, var(--yellow), transparent); }
+.stat-card.c-red::before { background: linear-gradient(90deg, var(--red), transparent); }
+
+.stat-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.stat-val {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.stat-val sup {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+}
+
+.stat-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 5px;
+}
+
+/* TIMELINE */
+.timeline-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.timeline-scroll {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.timeline-scroll::-webkit-scrollbar { height: 4px; }
+.timeline-scroll::-webkit-scrollbar-track { background: var(--surface2); }
+.timeline-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.timeline-inner {
+  display: flex;
+  gap: 3px;
+  min-width: max-content;
+  padding: 4px 0 12px;
+}
+
+.t-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+}
+
+.t-bar {
+  width: 28px;
+  border-radius: 4px 4px 0 0;
+  background: var(--border2);
+  cursor: pointer;
+  transition: opacity .15s, transform .15s;
+  position: relative;
+}
+.t-bar:hover { opacity: .8; transform: scaleY(1.03); }
+.t-bar.t-pass { background: var(--green); }
+.t-bar.t-warn { background: var(--yellow); }
+.t-bar.t-fail { background: var(--red); }
+
+.t-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text3);
+  text-align: center;
+  max-width: 36px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 50px;
+  line-height: 1;
+}
+
+.t-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text3);
+  text-align: center;
+}
+
+.timeline-axis {
+  display: flex;
+  gap: 3px;
+  min-width: max-content;
+  padding-left: 0;
+}
+
+/* TABLE */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.table-scroll {
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.table-scroll::-webkit-scrollbar { width: 4px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--surface2); }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+table { width: 100%; border-collapse: collapse; }
+
+thead { position: sticky; top: 0; z-index: 2; background: var(--surface2); }
+th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 9px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(31,42,61,.6);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(79,158,255,.025); }
+
+.td-seq {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.td-label {
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.td-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+.td-conf.c-g { color: var(--green); }
+.td-conf.c-y { color: var(--yellow); }
+.td-conf.c-r { color: var(--red); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+}
+.b-pass { background: var(--green-dim); color: var(--green); }
+.b-warn { background: var(--yellow-dim); color: var(--yellow); }
+.b-fail { background: var(--red-dim); color: var(--red); }
+.b-blue { background: var(--accent-dim); color: var(--accent); }
+.b-skip { background: rgba(74,85,104,.2); color: var(--text3); }
+
+.conf-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.conf-track {
+  width: 60px;
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.conf-fill {
+  height: 100%;
+  border-radius: 99px;
+}
+
+/* EMPTY / NO DATA */
+.empty {
+  text-align: center;
+  padding: 56px 24px;
+  color: var(--text3);
+}
+
+.empty-icon { font-size: 36px; margin-bottom: 14px; }
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.empty-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.7;
+}
+
+/* PROBLEM SIGNS */
+.prob-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.prob-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--border);
+}
+.prob-card.p-warn { border-left-color: var(--yellow); }
+.prob-card.p-fail { border-left-color: var(--red); }
+
+.prob-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.prob-cat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.prob-stats {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.8;
+}
+.prob-stats b { color: var(--text); }
+.prob-advice {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  line-height: 1.6;
+}
+
+/* SUMMARY BOX */
+.summary-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.summary-box.s-green { border-left-color: var(--green); }
+.summary-box.s-yellow { border-left-color: var(--yellow); }
+.summary-box.s-red { border-left-color: var(--red); }
+
+.summary-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-body {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.8;
+}
+.summary-body b { color: var(--text); }
+
+/* REP DOTS */
+.rep-dots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.rep-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--surface3);
+  cursor: default;
+  transition: transform .1s;
+}
+.rep-dot:hover { transform: scale(1.3); }
+.rep-dot.pass { background: var(--green); }
+.rep-dot.warn { background: var(--yellow); }
+.rep-dot.fail { background: var(--red); }
+
+/* TOOLTIP */
+.tooltip {
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+  max-width: 220px;
+  line-height: 1.6;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
+footer {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+}
+footer b { color: var(--accent); }
 </style>
 </head>
 <body>
+
+<div id="tooltip" class="tooltip"></div>
+
 <div class="wrap">
 
-<header>
-  <div class="tag">Thesis Testing Phase · Dynamic Session Analysis</div>
-  <h1>Sign<span>Speak</span> Dashboard</h1>
-  <p class="sub-h">Sign Language → TTS Pipeline · Upload any <code>session_YYYYMMDD_HHMMSS.csv</code> from your <code>logs/</code> folder — multiple files supported with date filtering</p>
-</header>
+  <header>
+    <div class="eyebrow">SignSpeak · Thesis Testing Phase</div>
+    <h1>Gesture Sequence<br><em>Validator</em></h1>
+    <p class="sub">Upload your session CSV · Each gesture is matched against the expected sequence in order, grouped by category, so you can see exactly which signs need more reps.</p>
+  </header>
 
-<!-- UPLOAD -->
-<div class="upload-zone" id="dropZone">
-  <input type="file" id="fileInput" accept=".csv" multiple>
-  <div class="upload-icon">📂</div>
-  <div class="upload-label">Drop session CSV files here, or click to browse</div>
-  <div class="upload-hint">Select all files from your <code>logs/</code> folder at once — the dashboard will auto-detect dates from filenames and let you filter by session or date range</div>
-  <div class="file-chips" id="fileChips"></div>
-</div>
+  <div class="two-col">
 
-<!-- NO DATA -->
-<div id="no-data">
-  <div class="nd-icon">🗂️</div>
-  <div class="nd-title" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;">No sessions loaded</div>
-  <div>Upload one or more <code>session_*.csv</code> files from your logs folder to begin analysis</div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboard" style="display:none;">
-
-  <!-- SESSION SELECTOR + DATE FILTER -->
-  <div class="sec-title"><span class="dot"></span> Session Selector</div>
-  <div class="session-nav" id="sessionNav"></div>
-
-  <div class="filter-bar" id="filterBar">
-    <span class="fl-label">Date Range:</span>
-    <button class="date-btn active" data-range="all">All Time</button>
-    <button class="date-btn" data-range="today">Today</button>
-    <button class="date-btn" data-range="week">Last 7 Days</button>
-    <button class="date-btn" data-range="month">Last 30 Days</button>
-    <span style="color:var(--border)">|</span>
-    <input type="date" id="dateFrom" class="date-input" placeholder="From">
-    <span style="color:var(--muted);font-size:11px;">→</span>
-    <input type="date" id="dateTo" class="date-input" placeholder="To">
-    <button class="date-btn" id="applyRange" style="border-color:var(--accent3);color:var(--accent3);">Apply Range</button>
-  </div>
-
-  <!-- METADATA -->
-  <div class="sec-title"><span class="dot"></span> Session Metadata</div>
-  <div class="info-grid" id="metaGrid"></div>
-
-  <!-- STAT CARDS -->
-  <div class="stats-grid" id="statsGrid"></div>
-
-  <!-- GESTURE RECOGNITION -->
-  <div class="sec-title"><span class="dot"></span> Gesture Recognition Performance</div>
-  <div class="g2">
-    <div class="card">
-      <div class="card-title">Confidence Score per Gesture (Chronological)</div>
-      <div class="cw tall"><canvas id="confLineChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal</b> ≥85% — reliable classification</span></div>
-        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal</b> 70–84% — review recommended</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk</b> &lt;70% — unreliable output</span></div>
-      </div>
-      <div class="concl" id="confLineConcl" style="border-left-color:#38bdf8;"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Sign Label Frequency Distribution</div>
-      <div class="cw tall"><canvas id="signDistChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d neu"></div><span class="bm-lbl"><b>Balanced</b> ≥5 reps/sign — statistically valid</span></div>
-        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Sparse</b> 2–4 reps — limited weight</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Insufficient</b> 1 rep — not evaluable</span></div>
-      </div>
-      <div class="concl" id="signDistConcl" style="border-left-color:#a78bfa;"></div>
-    </div>
-  </div>
-
-  <!-- LATENCY & AUDIO -->
-  <div class="sec-title"><span class="dot o"></span> System Latency &amp; Audio Output</div>
-  <div class="g2">
-    <div class="card">
-      <div class="card-title">Inference Time per Gesture (ms)</div>
-      <div class="cw"><canvas id="inferenceChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Real-Time</b> &lt;100ms — suitable for live use</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Delayed</b> ≥100ms — noticeable lag</span></div>
-      </div>
-      <div class="concl" id="inferConcl" style="border-left-color:#34d399;"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">TTS Audio Output Level per Sentence (dBFS)</div>
-      <div class="cw"><canvas id="dbfsChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Audible</b> -20 to -40 dBFS — clear output</span></div>
-        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Low</b> -40 to -70 dBFS — may need amplification</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Near-Silent</b> &lt;-70 dBFS — unusable</span></div>
-      </div>
-      <div class="concl" id="dbfsConcl" style="border-left-color:#f87171;"></div>
-    </div>
-  </div>
-
-  <!-- CONFIDENCE BY SIGN -->
-  <div class="sec-title"><span class="dot p"></span> Confidence Analysis by Sign Label</div>
-  <div class="g2">
-    <div class="card">
-      <div class="card-title">Average Confidence Score by Sign Label</div>
-      <div class="cw"><canvas id="avgConfChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Reliable</b> avg ≥85% — deployment-ready</span></div>
-        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Borderline</b> avg 70–84% — needs monitoring</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Unreliable</b> avg &lt;70% — retraining required</span></div>
-      </div>
-      <div class="concl" id="avgConfConcl" style="border-left-color:#a78bfa;"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">Confidence Distribution by Threshold Band</div>
-      <div class="cw"><canvas id="confBandChart"></canvas></div>
-      <div class="bm">
-        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal Zone</b> ≥85% — target &gt;80% of gestures</span></div>
-        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal Zone</b> 70–84%</span></div>
-        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk Zone</b> &lt;70% — target &lt;10%</span></div>
-      </div>
-      <div class="concl" id="confBandConcl" style="border-left-color:#fbbf24;"></div>
-    </div>
-  </div>
-
-  <!-- STT SECTION -->
-  <div id="sttSection" style="display:none;">
-    <div class="sec-title"><span class="dot g"></span> Speech-to-Text Results</div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-title">STT Transcription Log</div>
-        <div id="sttTableWrap"></div>
-        <div class="bm">
-          <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Clear</b> &gt;-40 dBFS</span></div>
-          <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Quiet</b> -40 to -70 dBFS</span></div>
-          <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Very Quiet</b> &lt;-70 dBFS</span></div>
+    <!-- LEFT: GESTURE REFERENCE + UPLOAD -->
+    <div>
+      <!-- Upload -->
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head">
+          <span class="panel-title">Session CSV</span>
+          <span class="panel-badge" id="uploadBadge">No file</span>
         </div>
-        <div class="concl" id="sttConcl" style="border-left-color:#34d399;"></div>
-      </div>
-      <div class="card">
-        <div class="card-title">STT Transcription Latency (ms)</div>
-        <div class="cw"><canvas id="sttLatChart"></canvas></div>
-        <div class="bm">
-          <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Fast</b> &lt;500ms</span></div>
-          <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Acceptable</b> 500–1000ms</span></div>
-          <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Slow</b> &gt;1000ms</span></div>
+        <div class="panel-body">
+          <div class="upload-zone" id="dropZone">
+            <input type="file" id="fileInput" accept=".csv">
+            <div class="upload-icon">📂</div>
+            <div class="upload-label">Drop session CSV here</div>
+            <div class="upload-hint">session_YYYYMMDD_HHMMSS.csv</div>
+          </div>
+          <div id="fileInfo" style="display:none;"></div>
         </div>
-        <div class="concl" id="sttLatConcl" style="border-left-color:#34d399;"></div>
+      </div>
+
+      <!-- Gesture list -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Gesture Sequence</span>
+          <span class="panel-badge" id="gestureBadge">36 signs</span>
+        </div>
+        <div class="panel-body" style="padding:12px 10px;">
+          <div class="gesture-list" id="gestureList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: ANALYSIS -->
+    <div>
+      <!-- No data state -->
+      <div id="noData" class="panel">
+        <div class="empty">
+          <div class="empty-icon">🗂️</div>
+          <div class="empty-title">Waiting for session data</div>
+          <div class="empty-sub">Upload a <code>session_*.csv</code> file<br>to begin gesture sequence analysis</div>
+        </div>
+      </div>
+
+      <!-- Dashboard (hidden until data loaded) -->
+      <div id="dashboard" style="display:none;">
+
+        <!-- STAT ROW -->
+        <div class="stat-row" id="statRow"></div>
+
+        <!-- SUMMARY -->
+        <div id="summaryBox" class="summary-box"></div>
+
+        <!-- TIMELINE -->
+        <div class="timeline-wrap">
+          <div class="section-title"><span class="dot"></span> Detection Timeline — Confidence per Gesture (in order)</div>
+          <div class="timeline-scroll">
+            <div class="timeline-inner" id="timelineInner"></div>
+          </div>
+        </div>
+
+        <!-- PROBLEM SIGNS -->
+        <div id="probSection" style="display:none;">
+          <div class="section-title" style="margin-top:8px;"><span class="dot r"></span> Signs Needing Attention</div>
+          <div class="prob-grid" id="probGrid"></div>
+        </div>
+
+        <!-- FULL TABLE -->
+        <div class="section-title" style="margin-top:8px;"><span class="dot g"></span> Full Detection Log — Chronological Sequence</div>
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Expected Sign</th>
+                  <th>Detected</th>
+                  <th>Rep</th>
+                  <th>Confidence</th>
+                  <th>Inference</th>
+                  <th>Time</th>
+                  <th>Zone</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CATEGORY SUMMARY -->
+        <div class="section-title" style="margin-top:8px;"><span class="dot"></span> Performance by Category</div>
+        <div id="catSummary"></div>
+
       </div>
     </div>
   </div>
 
-  <!-- PER-GESTURE BARS -->
-  <div class="sec-title"><span class="dot p"></span> Per-Gesture Confidence Breakdown</div>
-  <div class="card" style="margin-bottom:18px;">
-    <div class="card-title">All Gesture Detections — Individual Scores with Zone Classification</div>
-    <div class="scroll-body" id="confBars"></div>
-    <div class="bm" style="margin-top:14px;">
-      <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal</b> ≥85%</span></div>
-      <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal</b> 70–84%</span></div>
-      <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk</b> &lt;70%</span></div>
-    </div>
-    <div class="concl" id="perGestureConcl" style="border-left-color:#38bdf8;margin-top:14px;"></div>
-  </div>
-
-  <!-- TTS TABLE -->
-  <div class="sec-title"><span class="dot g"></span> TTS Output Log</div>
-  <div class="card" style="margin-bottom:18px;">
-    <div class="card-title">Sentence-level TTS Events — Sign Input → Natural Language Output</div>
-    <div class="scroll-body">
-      <table>
-        <thead><tr><th>#</th><th>Time</th><th>TTS Text</th><th>Audio Level</th><th>Latency</th><th>Audibility</th></tr></thead>
-        <tbody id="ttsTableBody"></tbody>
-      </table>
-    </div>
-    <div class="bm" style="margin-top:14px;">
-      <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Audible</b> -20 to -40 dBFS</span></div>
-      <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Low</b> -40 to -70 dBFS</span></div>
-      <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Near-Silent</b> &lt;-70 dBFS</span></div>
-    </div>
-    <div class="concl" id="ttsConcl" style="border-left-color:#34d399;margin-top:14px;"></div>
-  </div>
-
-  <!-- KEY FINDINGS -->
-  <div class="sec-title"><span class="dot g"></span> Analysis &amp; Key Findings</div>
-  <div class="obs-box" id="keyFindings"></div>
-  <div class="obs-box" id="recommendations" style="border-left-color:var(--accent2);"></div>
-
-  <footer>Generated by <span>SignSpeak</span> Dynamic Dashboard · Thesis Testing Phase · Sessions: <span id="footerSessions">0</span> · Total Events: <span id="footerEvents">0</span></footer>
-</div>
+  <footer>SignSpeak Gesture Sequence Validator · <b>Thesis Testing</b> · Signs matched in chronological order against expected sequence</footer>
 </div>
 
 <script>
-let allSessions={};
-let activeFilter={type:'all',session:'all'};
-let charts={};
+// ─── REFERENCE GESTURE LIST (from the CSV provided) ───────────────────────
+const GESTURE_LIST = [
+  {id:0,  label:'Hello',     cat:'POLITENESS'},
+  {id:1,  label:'Please',    cat:'POLITENESS'},
+  {id:2,  label:'Thanks',    cat:'POLITENESS'},
+  {id:3,  label:'Sorry',     cat:'POLITENESS'},
+  {id:4,  label:'Goodbye',   cat:'POLITENESS'},
+  {id:5,  label:'Want',      cat:'ACTIONS'},
+  {id:6,  label:'Help',      cat:'ACTIONS'},
+  {id:7,  label:'Go',        cat:'ACTIONS'},
+  {id:8,  label:'Eat',       cat:'ACTIONS'},
+  {id:9,  label:'Sleep',     cat:'ACTIONS'},
+  {id:10, label:'Understand',cat:'ACTIONS'},
+  {id:11, label:'Know',      cat:'ACTIONS'},
+  {id:12, label:'How',       cat:'QUESTIONS'},
+  {id:13, label:'What',      cat:'QUESTIONS'},
+  {id:14, label:'Where',     cat:'QUESTIONS'},
+  {id:15, label:'Why',       cat:'QUESTIONS'},
+  {id:16, label:'Who',       cat:'QUESTIONS'},
+  {id:17, label:'I',         cat:'PEOPLE'},
+  {id:18, label:'You',       cat:'PEOPLE'},
+  {id:19, label:'Me',        cat:'PEOPLE'},
+  {id:20, label:'Friend',    cat:'PEOPLE'},
+  {id:21, label:'Family',    cat:'PEOPLE'},
+  {id:22, label:'Yes',       cat:'ANSWERS'},
+  {id:23, label:'No',        cat:'ANSWERS'},
+  {id:24, label:'Okay',      cat:'ANSWERS'},
+  {id:25, label:'Good',      cat:'ANSWERS'},
+  {id:27, label:'Today',     cat:'TIME'},
+  {id:28, label:'Home',      cat:'PLACE'},
+  {id:29, label:'Here',      cat:'PLACE'},
+  {id:30, label:'Morning',   cat:'POLITENESS'},
+  {id:31, label:'Afternoon', cat:'POLITENESS'},
+  {id:32, label:'From',      cat:'PLACE'},
+  {id:33, label:'Name',      cat:'PEOPLE'},
+  {id:34, label:'Like',      cat:'ACTIONS'},
+  {id:35, label:'Love',      cat:'ACTIONS'},
+];
 
-// CSV parser with quoted field support
-function parseCSV(text){
-  const lines=text.trim().split('\n');
-  const headers=lines[0].split(',').map(h=>h.trim().replace(/\r/,''));
-  return lines.slice(1).map(line=>{
-    const vals=[];let cur='',inQ=false;
-    for(let i=0;i<line.length;i++){
-      if(line[i]==='"'){inQ=!inQ;}
-      else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
-      else{cur+=line[i];}
+const CAT_COLORS = {
+  'POLITENESS': '#4f9eff',
+  'ACTIONS':    '#a78bfa',
+  'QUESTIONS':  '#f5c842',
+  'PEOPLE':     '#3ecf8e',
+  'ANSWERS':    '#fb923c',
+  'TIME':       '#f472b6',
+  'PLACE':      '#2dd4bf',
+};
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let sessionData = null;
+
+// ─── CSV PARSER ─────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/\r/, ''));
+  return lines.slice(1).map(line => {
+    const vals = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+      else { cur += line[i]; }
     }
-    vals.push(cur.trim().replace(/\r/,''));
-    const row={};
-    headers.forEach((h,i)=>row[h]=vals[i]||'');
+    vals.push(cur.trim().replace(/\r/, ''));
+    const row = {};
+    headers.forEach((h, i) => row[h] = vals[i] || '');
     return row;
   });
 }
 
-const fileInput=document.getElementById('fileInput');
-const dropZone=document.getElementById('dropZone');
-fileInput.addEventListener('change',e=>loadFiles(e.target.files));
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag');});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag');loadFiles(e.dataTransfer.files);});
+// ─── UPLOAD ─────────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
 
-function loadFiles(files){
-  Array.from(files).forEach(file=>{
-    if(!file.name.endsWith('.csv'))return;
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const rows=parseCSV(e.target.result);
-      const m=file.name.match(/session_(\d{8})_(\d{6})/);
-      let sessionDate=null,sessionLabel=file.name;
-      if(m){
-        const d=m[1],t=m[2];
-        sessionDate=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
-        sessionLabel=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)} ${t.slice(0,2)}:${t.slice(2,4)}`;
-      }
-      allSessions[file.name]={name:file.name,label:sessionLabel,date:sessionDate,rows};
-      renderChips();renderSessionNav();renderDashboard();
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+function loadFile(file) {
+  if (!file.name.endsWith('.csv')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSV(e.target.result);
+    processSession(rows, file.name);
+  };
+  reader.readAsText(file);
+}
+
+// ─── CORE LOGIC ─────────────────────────────────────────────────────────────
+function processSession(rows, filename) {
+  const gestures = rows.filter(r => r.event_type === 'GESTURE');
+
+  // Match each gesture detection to its place in the expected sequence
+  // We match by predicted_label against GESTURE_LIST in chronological order
+  // Build a map: label → list of detections in order
+  const byLabel = {};
+  GESTURE_LIST.forEach(g => { byLabel[g.label] = []; });
+
+  // Go through gestures in CSV order, assign to their label bucket
+  gestures.forEach((g, csvIdx) => {
+    const lbl = g.predicted_label;
+    if (byLabel[lbl] !== undefined) {
+      byLabel[lbl].push({
+        csvIdx,
+        conf: parseFloat(g.confidence),
+        infMs: parseFloat(g.inference_time_ms),
+        time: g.datetime?.slice(11, 19) || '',
+        rawRow: g,
+      });
+    }
+  });
+
+  // Build ordered rows: for each gesture in sequence, assign reps in order
+  const seqRows = [];
+  GESTURE_LIST.forEach(glItem => {
+    const reps = byLabel[glItem.label] || [];
+    if (reps.length === 0) {
+      // Not detected at all
+      seqRows.push({
+        glItem,
+        repNum: null,
+        conf: null,
+        infMs: null,
+        time: null,
+        detected: false,
+        totalReps: 0,
+      });
+    } else {
+      reps.forEach((rep, i) => {
+        seqRows.push({
+          glItem,
+          repNum: i + 1,
+          conf: rep.conf,
+          infMs: rep.infMs,
+          time: rep.time,
+          detected: true,
+          totalReps: reps.length,
+        });
+      });
+    }
+  });
+
+  // Per-label summary
+  const labelSummary = {};
+  GESTURE_LIST.forEach(g => {
+    const reps = byLabel[g.label] || [];
+    const confs = reps.map(r => r.conf);
+    labelSummary[g.label] = {
+      label: g.label,
+      cat: g.cat,
+      count: confs.length,
+      avgConf: confs.length ? confs.reduce((a,b)=>a+b,0)/confs.length : null,
+      minConf: confs.length ? Math.min(...confs) : null,
+      maxConf: confs.length ? Math.max(...confs) : null,
+      passCount: confs.filter(c => c >= 0.85).length,
+      warnCount: confs.filter(c => c >= 0.70 && c < 0.85).length,
+      failCount: confs.filter(c => c < 0.70).length,
+      reps,
     };
-    reader.readAsText(file);
   });
+
+  sessionData = { filename, gestures, seqRows, byLabel, labelSummary, rows };
+  render();
 }
 
-function removeSession(name){
-  delete allSessions[name];
-  if(activeFilter.session===name)activeFilter={type:'all',session:'all'};
-  renderChips();renderSessionNav();renderDashboard();
+// ─── RENDER ─────────────────────────────────────────────────────────────────
+function confColor(c) {
+  if (c === null) return 'var(--text3)';
+  if (c >= 0.85) return 'var(--green)';
+  if (c >= 0.70) return 'var(--yellow)';
+  return 'var(--red)';
 }
 
-function renderChips(){
-  document.getElementById('fileChips').innerHTML=
-    Object.values(allSessions).map(s=>`<span class="chip">📄 ${s.label} <span class="rm" onclick="removeSession('${s.name}')">✕</span></span>`).join('');
+function confZone(c) {
+  if (c === null) return 'Not detected';
+  if (c >= 0.85) return 'Optimal';
+  if (c >= 0.70) return 'Marginal';
+  return 'At-Risk';
 }
 
-function renderSessionNav(){
-  const sessions=Object.values(allSessions);
-  if(!sessions.length){document.getElementById('sessionNav').innerHTML='';return;}
-  let html=`<button class="s-pill all-pill ${activeFilter.session==='all'?'active':''}" onclick="setSessionFilter('all',this)">All Sessions (${sessions.length})</button>`;
-  [...sessions].sort((a,b)=>a.label.localeCompare(b.label)).forEach(s=>{
-    html+=`<button class="s-pill ${activeFilter.session===s.name?'active':''}" onclick="setSessionFilter('${s.name}',this)">${s.label}</button>`;
-  });
-  document.getElementById('sessionNav').innerHTML=html;
+function confBadge(c) {
+  if (c === null) return '<span class="badge b-skip">Not detected</span>';
+  if (c >= 0.85) return '<span class="badge b-pass">Optimal</span>';
+  if (c >= 0.70) return '<span class="badge b-warn">Marginal</span>';
+  return '<span class="badge b-fail">At-Risk</span>';
 }
 
-function setSessionFilter(name,el){
-  activeFilter={type:'all',session:name};
-  document.querySelectorAll('.s-pill').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  document.querySelectorAll('.date-btn[data-range]').forEach(b=>b.classList.toggle('active',b.dataset.range==='all'));
-  renderDashboard();
-}
+function render() {
+  const { filename, gestures, seqRows, byLabel, labelSummary, rows } = sessionData;
 
-document.querySelectorAll('.date-btn[data-range]').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.date-btn[data-range]').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    activeFilter={type:btn.dataset.range,session:'all'};
-    document.querySelectorAll('.s-pill').forEach(b=>b.classList.remove('active'));
-    document.querySelector('.s-pill.all-pill')?.classList.add('active');
-    renderDashboard();
-  });
-});
-document.getElementById('applyRange').addEventListener('click',()=>{
-  activeFilter={type:'custom',session:'all',from:document.getElementById('dateFrom').value,to:document.getElementById('dateTo').value};
-  renderDashboard();
-});
+  // Show dashboard
+  document.getElementById('noData').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
 
-function getFilteredRows(){
-  const sessions=Object.values(allSessions);
-  if(!sessions.length)return[];
-  let rows=activeFilter.session!=='all'?(allSessions[activeFilter.session]?.rows||[]):sessions.flatMap(s=>s.rows);
-  if(activeFilter.type==='today'){const t=new Date().toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)===t);}
-  else if(activeFilter.type==='week'){const c=new Date(Date.now()-7*864e5).toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)>=c);}
-  else if(activeFilter.type==='month'){const c=new Date(Date.now()-30*864e5).toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)>=c);}
-  else if(activeFilter.type==='custom'){
-    if(activeFilter.from)rows=rows.filter(r=>r.datetime?.slice(0,10)>=activeFilter.from);
-    if(activeFilter.to)rows=rows.filter(r=>r.datetime?.slice(0,10)<=activeFilter.to);
-  }
-  return rows;
-}
+  // Upload badge
+  document.getElementById('uploadBadge').textContent = filename;
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('fileInfo').innerHTML = `
+    <div class="loaded-file">
+      <span class="fname">✓ ${filename}</span>
+      <span class="rm" onclick="clearData()">✕</span>
+    </div>`;
 
-const bs={
-  x:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}},
-  y:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}}
-};
-function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
-const pal=['#38bdf8','#fb923c','#a78bfa','#34d399','#fbbf24','#f472b6','#f87171','#60a5fa','#4ade80','#e879f9','#2dd4bf','#facc15'];
+  // Stats
+  const allConfs = gestures.map(g => parseFloat(g.confidence));
+  const totalGestures = gestures.length;
+  const passCount = allConfs.filter(c => c >= 0.85).length;
+  const warnCount = allConfs.filter(c => c >= 0.70 && c < 0.85).length;
+  const failCount = allConfs.filter(c => c < 0.70).length;
+  const avgConf = allConfs.reduce((a,b)=>a+b,0)/allConfs.length;
+  const detectedLabels = GESTURE_LIST.filter(g => (byLabel[g.label]||[]).length > 0).length;
+  const missedLabels = GESTURE_LIST.length - detectedLabels;
 
-function renderDashboard(){
-  const sessions=Object.values(allSessions);
-  document.getElementById('no-data').style.display=sessions.length===0?'block':'none';
-  document.getElementById('dashboard').style.display=sessions.length===0?'none':'block';
-  if(!sessions.length)return;
+  document.getElementById('statRow').innerHTML = `
+    <div class="stat-card c-blue">
+      <div class="stat-lbl">Total Detections</div>
+      <div class="stat-val">${totalGestures}</div>
+      <div class="stat-note">${detectedLabels} / ${GESTURE_LIST.length} signs seen</div>
+    </div>
+    <div class="stat-card c-green">
+      <div class="stat-lbl">Avg Confidence</div>
+      <div class="stat-val">${(avgConf*100).toFixed(1)}<sup>%</sup></div>
+      <div class="stat-note">${passCount} optimal detections</div>
+    </div>
+    <div class="stat-card c-yellow">
+      <div class="stat-lbl">Marginal</div>
+      <div class="stat-val">${warnCount}</div>
+      <div class="stat-note">${(warnCount/totalGestures*100).toFixed(0)}% of detections</div>
+    </div>
+    <div class="stat-card c-red">
+      <div class="stat-lbl">At-Risk / Missed</div>
+      <div class="stat-val">${failCount + missedLabels}</div>
+      <div class="stat-note">${failCount} low-conf + ${missedLabels} not seen</div>
+    </div>`;
 
-  const rows=getFilteredRows();
-  const gestures=rows.filter(r=>r.event_type==='GESTURE');
-  const ttsRows=rows.filter(r=>r.event_type==='TTS');
-  const sttRows=rows.filter(r=>r.event_type==='STT');
+  // Summary
+  const rate = Math.round(passCount / totalGestures * 100);
+  let sClass = rate >= 80 ? 's-green' : rate >= 60 ? 's-yellow' : 's-red';
+  let sTitle = rate >= 80 ? '✓ Strong Session' : rate >= 60 ? '⚠ Mostly Good — Some Signs Need Work' : '✗ Multiple Signs Need Attention';
+  document.getElementById('summaryBox').className = `summary-box ${sClass}`;
+  document.getElementById('summaryBox').innerHTML = `
+    <div class="summary-title">${sTitle}</div>
+    <div class="summary-body">
+      <b>${passCount} of ${totalGestures} gestures (${rate}%)</b> scored in the Optimal zone (≥85%).
+      ${warnCount > 0 ? `<b>${warnCount} Marginal</b> (70–84%) and ` : ''}
+      ${failCount > 0 ? `<b>${failCount} At-Risk</b> (&lt;70%) detections recorded. ` : ''}
+      ${missedLabels > 0 ? `<b>${missedLabels} sign${missedLabels!==1?'s':''}</b> from the sequence were not detected in this session. ` : 'All signs in the sequence were detected at least once. '}
+      Signs with avg confidence below 80% are highlighted below with specific advice.
+    </div>`;
 
-  if(!gestures.length){
-    document.getElementById('statsGrid').innerHTML='<div style="color:var(--muted);padding:20px;grid-column:1/-1;">No gesture data found in the selected date range.</div>';
-    return;
-  }
+  // Timeline
+  const maxBarH = 80;
+  document.getElementById('timelineInner').innerHTML = seqRows
+    .filter(r => r.detected)
+    .map(r => {
+      const pct = r.conf !== null ? r.conf : 0;
+      const h = Math.max(8, Math.round(pct * maxBarH));
+      const col = confColor(r.conf);
+      const cls = r.conf >= 0.85 ? 't-pass' : r.conf >= 0.70 ? 't-warn' : 't-fail';
+      const catCol = CAT_COLORS[r.glItem.cat] || 'var(--accent)';
+      return `<div class="t-block"
+        onmouseenter="showTooltip(event,'${r.glItem.label} #${r.repNum}\n${r.conf !== null ? (r.conf*100).toFixed(1)+'%' : 'n/a'} — ${confZone(r.conf)}\n${r.time}')"
+        onmouseleave="hideTooltip()">
+        <div class="t-bar ${cls}" style="height:${h}px;margin-top:${maxBarH-h}px;"></div>
+        <div class="t-conf" style="color:${col}">${r.conf !== null ? (r.conf*100).toFixed(0) : '—'}</div>
+        <div class="t-label" style="color:${catCol}">${r.glItem.label}</div>
+      </div>`;
+    }).join('');
 
-  const confs=gestures.map(g=>parseFloat(g.confidence));
-  const inf=gestures.map(g=>parseFloat(g.inference_time_ms));
-  const avgConf=confs.reduce((a,b)=>a+b,0)/confs.length;
-  const high=confs.filter(c=>c>=0.85).length;
-  const mid=confs.filter(c=>c>=0.70&&c<0.85).length;
-  const low=confs.filter(c=>c<0.70).length;
-  const avgInf=inf.reduce((a,b)=>a+b,0)/inf.length;
-  const highRate=Math.round(high/confs.length*100);
-  const ttsDbfs=ttsRows.map(t=>parseFloat(t.tts_dbfs)).filter(v=>!isNaN(v));
-  const avgDbfs=ttsDbfs.length?ttsDbfs.reduce((a,b)=>a+b,0)/ttsDbfs.length:null;
-  const audible=ttsDbfs.filter(v=>v>=-40).length;
-  const labelCounts={};
-  gestures.forEach(g=>{labelCounts[g.predicted_label]=(labelCounts[g.predicted_label]||0)+1;});
-  const labelAvgConf={};
-  gestures.forEach(g=>{
-    if(!labelAvgConf[g.predicted_label])labelAvgConf[g.predicted_label]=[];
-    labelAvgConf[g.predicted_label].push(parseFloat(g.confidence));
-  });
-  const numSessions=activeFilter.session==='all'?sessions.length:1;
-  const sessionStart=rows.find(r=>r.datetime)?.datetime||'—';
-  const sessionEnd=[...rows].reverse().find(r=>r.datetime)?.datetime||'—';
+  // Problem signs
+  const problems = Object.values(labelSummary)
+    .filter(s => s.count > 0 && (s.avgConf !== null && s.avgConf < 0.85))
+    .sort((a,b) => a.avgConf - b.avgConf);
 
-  // Metadata
-  document.getElementById('metaGrid').innerHTML=`
-    <div class="info-row"><span class="k">Sessions Loaded</span><span class="v">${numSessions}</span></div>
-    <div class="info-row"><span class="k">Date Range</span><span class="v">${sessionStart.slice(0,10)} → ${sessionEnd.slice(0,10)}</span></div>
-    <div class="info-row"><span class="k">Time Range</span><span class="v">${sessionStart.slice(11,19)} → ${sessionEnd.slice(11,19)}</span></div>
-    <div class="info-row"><span class="k">Total Events</span><span class="v">${rows.length}</span></div>
-    <div class="info-row"><span class="k">Unique Signs</span><span class="v">${Object.keys(labelCounts).length}</span></div>
-    <div class="info-row"><span class="k">STT Events</span><span class="v">${sttRows.length||'0 (none)'}</span></div>
-    <div class="info-row"><span class="k">Ground Truth</span><span class="v">${gestures.some(g=>g.ground_truth)?'Provided':'Not provided'}</span></div>
-    <div class="info-row"><span class="k">Reconnects</span><span class="v">${rows.filter(r=>r.event_type==='RECONNECT').length}</span></div>
-  `;
+  const noProblems = Object.values(labelSummary)
+    .filter(s => s.count > 0 && (s.avgConf !== null && s.avgConf >= 0.85));
 
-  // Stat cards
-  document.getElementById('statsGrid').innerHTML=`
-    <div class="stat"><div class="lbl">Total Gestures</div><div class="val">${gestures.length}</div><div class="info">Detected events</div><div class="bar" style="background:linear-gradient(90deg,var(--accent),transparent)"></div></div>
-    <div class="stat"><div class="lbl">TTS Outputs</div><div class="val">${ttsRows.length}</div><div class="info">Sentences spoken</div><div class="bar" style="background:linear-gradient(90deg,var(--accent2),transparent)"></div></div>
-    <div class="stat"><div class="lbl">Avg Confidence</div><div class="val">${Math.round(avgConf*100)}<span>%</span></div><div class="info">Across all gestures</div><div class="bar" style="background:linear-gradient(90deg,${avgConf>=0.85?'#34d399':avgConf>=0.70?'#fbbf24':'#f87171'},transparent)"></div></div>
-    <div class="stat"><div class="lbl">Unique Signs</div><div class="val">${Object.keys(labelCounts).length}</div><div class="info">${Object.keys(labelCounts).slice(0,3).join(', ')}…</div><div class="bar" style="background:linear-gradient(90deg,var(--accent4),transparent)"></div></div>
-    <div class="stat"><div class="lbl">Avg Inference</div><div class="val">${Math.round(avgInf)}<span>ms</span></div><div class="info">Per gesture</div><div class="bar" style="background:linear-gradient(90deg,${avgInf<100?'#34d399':'#f87171'},transparent)"></div></div>
-    <div class="stat"><div class="lbl">Optimal Rate</div><div class="val">${highRate}<span>%</span></div><div class="info">≥85% confidence</div><div class="bar" style="background:linear-gradient(90deg,${highRate>=80?'#34d399':highRate>=60?'#fbbf24':'#f87171'},transparent)"></div></div>
-    ${avgDbfs!==null?`<div class="stat"><div class="lbl">Avg TTS Level</div><div class="val">${Math.round(avgDbfs)}<span>dBFS</span></div><div class="info">${audible}/${ttsRows.length} audible</div><div class="bar" style="background:linear-gradient(90deg,${avgDbfs>=-40?'#34d399':avgDbfs>=-70?'#fbbf24':'#f87171'},transparent)"></div></div>`:''}
-    ${sttRows.length?`<div class="stat"><div class="lbl">STT Events</div><div class="val">${sttRows.length}</div><div class="info">Transcriptions logged</div><div class="bar" style="background:linear-gradient(90deg,var(--accent3),transparent)"></div></div>`:''}
-  `;
-
-  // Chart 1: Confidence Line
-  dc('confLine');
-  charts['confLine']=new Chart(document.getElementById('confLineChart'),{
-    type:'line',
-    data:{
-      labels:gestures.map((_,i)=>`${i+1}`),
-      datasets:[{data:confs.map(c=>+(c*100).toFixed(1)),borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.07)',
-        pointBackgroundColor:confs.map(c=>c>=0.85?'#34d399':c>=0.70?'#fbbf24':'#f87171'),
-        pointRadius:gestures.length>100?1:gestures.length>40?2:4,tension:0.35,fill:true}]
-    },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
-      tooltip:{callbacks:{label:ctx=>{const g=gestures[ctx.dataIndex];return[`Conf: ${ctx.raw}%`,`Sign: ${g.predicted_label}`,`${g.datetime?.slice(11,19)||''}`];}}}},
-      scales:{x:{...bs.x},y:{...bs.y,min:0,max:100,ticks:{...bs.y.ticks,callback:v=>v+'%'}}}}
-  });
-  const topG=gestures[confs.indexOf(Math.max(...confs))];
-  const botG=gestures[confs.indexOf(Math.min(...confs))];
-  document.getElementById('confLineConcl').innerHTML=`
-    <span class="verdict ${highRate>=80?'v-pass':highRate>=60?'v-part':'v-flag'}">${highRate>=80?'Meets Threshold':highRate>=60?'Partially Meets Threshold':'Below Threshold'}</span><br>
-    <b>${high} of ${gestures.length} gestures (${highRate}%)</b> scored at or above the 85% Optimal benchmark.
-    Session high: <b>${topG.predicted_label} at ${(parseFloat(topG.confidence)*100).toFixed(1)}%</b>.
-    Session low: <b>${botG.predicted_label} at ${(parseFloat(botG.confidence)*100).toFixed(1)}%</b>.
-    ${low>0?`<b>${low} At-Risk detection${low!==1?'s':''} (${(low/gestures.length*100).toFixed(0)}%)</b> require investigation — check lighting conditions and signing posture for affected labels.`:'No At-Risk detections recorded — an excellent result.'}
-    ${highRate>=80?'The model demonstrates deployment-ready confidence stability.':'Further training on underperforming signs is recommended before deployment.'}`;
-
-  // Chart 2: Distribution
-  const sortedLabels=Object.entries(labelCounts).sort((a,b)=>b[1]-a[1]);
-  dc('signDist');
-  charts['signDist']=new Chart(document.getElementById('signDistChart'),{
-    type:'doughnut',
-    data:{labels:sortedLabels.map(([k])=>k),datasets:[{data:sortedLabels.map(([,v])=>v),
-      backgroundColor:sortedLabels.map((_,i)=>pal[i%pal.length]+'cc'),
-      borderColor:sortedLabels.map((_,i)=>pal[i%pal.length]),borderWidth:2,hoverOffset:8}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
-      plugins:{legend:{display:true,position:'right',labels:{color:'#94a3b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:10,boxHeight:10}}}}
-  });
-  const sufficient=sortedLabels.filter(([,v])=>v>=5).length;
-  const singleRep=sortedLabels.filter(([,v])=>v===1).length;
-  document.getElementById('signDistConcl').innerHTML=`
-    <span class="verdict ${sufficient===sortedLabels.length?'v-pass':singleRep>0?'v-part':'v-part'}">${sufficient===sortedLabels.length?'Balanced Coverage':singleRep>0?'Uneven Coverage':'Sparse Coverage'}</span><br>
-    <b>${sortedLabels.length} unique signs</b> detected. Most frequent: <b>${sortedLabels[0][0]} (${sortedLabels[0][1]}×)</b>.
-    ${sufficient>0?`<b>${sufficient} sign${sufficient!==1?'s':''}</b> have ≥5 repetitions (statistically meaningful). `:''}
-    ${singleRep>0?`<b>${singleRep} sign${singleRep!==1?'s':''}</b> appeared only once — insufficient for per-class evaluation. `:''}
-    Target ≥5 repetitions per sign for statistically valid accuracy assessment.`;
-
-  // Chart 3: Inference
-  dc('infer');
-  charts['infer']=new Chart(document.getElementById('inferenceChart'),{
-    type:'bar',
-    data:{labels:gestures.map((_,i)=>`#${i+1}`),datasets:[{data:inf,
-      backgroundColor:inf.map(v=>v>100?'rgba(248,113,113,0.7)':'rgba(56,189,248,0.6)'),
-      borderColor:inf.map(v=>v>100?'#f87171':'#38bdf8'),borderWidth:1,borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{x:{...bs.x,ticks:{...bs.x.ticks,display:gestures.length<=60}},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+'ms'}}}}
-  });
-  const delayed=inf.filter(v=>v>=100).length;
-  document.getElementById('inferConcl').innerHTML=`
-    <span class="verdict ${delayed===0?'v-pass':delayed<=2?'v-part':'v-flag'}">${delayed===0?'Meets Real-Time Requirement':delayed<=2?'Mostly Real-Time':'Latency Issues Present'}</span><br>
-    Average: <b>${avgInf.toFixed(1)}ms</b>. Max: <b>${Math.max(...inf)}ms</b>. Min: <b>${Math.min(...inf)}ms</b>.
-    ${delayed===0?'All gestures completed within the 100ms real-time threshold. The inference pipeline is performing optimally for live assistive communication.'
-    :`<b>${delayed} gesture${delayed!==1?'s':''}</b> exceeded 100ms. ${Math.max(...inf)>150?'The peak value suggests a cold-start initialization cost on session boot — a one-time overhead, not a systemic issue.':'Monitor for persistent spikes in extended sessions.'}`}`;
-
-  // Chart 4: dBFS
-  dc('dbfs');
-  if(ttsRows.length){
-    charts['dbfs']=new Chart(document.getElementById('dbfsChart'),{
-      type:'bar',
-      data:{
-        labels:ttsRows.map(t=>(t.tts_text||'').replace(/"/g,'').slice(0,18)||'TTS'),
-        datasets:[{data:ttsRows.map(t=>parseFloat(t.tts_dbfs)||0),
-          backgroundColor:ttsRows.map(t=>{const v=parseFloat(t.tts_dbfs);return v>-40?'rgba(52,211,153,0.7)':v>-70?'rgba(251,191,36,0.7)':'rgba(248,113,113,0.7)';}),
-          borderColor:ttsRows.map(t=>{const v=parseFloat(t.tts_dbfs);return v>-40?'#34d399':v>-70?'#fbbf24':'#f87171';}),
-          borderWidth:1,borderRadius:4}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{...bs.x,ticks:{...bs.x.ticks,maxRotation:35,display:ttsRows.length<=30}},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+' dBFS'}}}}
-    });
-    const nearSil=ttsDbfs.filter(v=>v<-70).length;
-    const minDb=Math.min(...ttsDbfs),maxDb=Math.max(...ttsDbfs);
-    document.getElementById('dbfsConcl').innerHTML=`
-      <span class="verdict ${audible===ttsRows.length?'v-pass':nearSil>0?'v-flag':'v-part'}">${audible===ttsRows.length?'All Outputs Audible':nearSil>0?'Requires Immediate Attention':'Partially Audible'}</span><br>
-      Audio range: <b>${minDb.toFixed(1)} to ${maxDb.toFixed(1)} dBFS</b> (spread of ${(maxDb-minDb).toFixed(1)} dB).
-      <b>${audible} of ${ttsRows.length}</b> outputs fall within the audible benchmark.
-      ${nearSil>0?`<b>${nearSil} output${nearSil!==1?'s are':' is'} near-silent (&lt;-70 dBFS)</b> — effectively inaudible in real-world environments. `:''}
-      ${audible<ttsRows.length?'Implementing AGC or audio normalization targeting -20 to -35 dBFS is strongly recommended before user-facing testing.':'TTS audio levels are consistent and within target range.'}`;
+  if (problems.length > 0) {
+    document.getElementById('probSection').style.display = 'block';
+    document.getElementById('probGrid').innerHTML = problems.map(p => {
+      const avgPct = (p.avgConf*100).toFixed(1);
+      const cls = p.avgConf < 0.70 ? 'p-fail' : 'p-warn';
+      const catCol = CAT_COLORS[p.cat] || 'var(--accent)';
+      const repDots = p.reps.map(r => {
+        const dc = r.conf >= 0.85 ? 'pass' : r.conf >= 0.70 ? 'warn' : 'fail';
+        return `<div class="rep-dot ${dc}" title="${(r.conf*100).toFixed(1)}%"></div>`;
+      }).join('');
+      const advice = p.avgConf < 0.70
+        ? 'Priority: Add more reps with varied lighting and hand angles. Consider re-recording the training data for this gesture.'
+        : 'Near threshold: A few more consistent reps should push this into the Optimal zone. Focus on clear, deliberate signing.';
+      return `<div class="prob-card ${cls}">
+        <div class="prob-name">${p.label}</div>
+        <div class="prob-cat" style="color:${catCol}">${p.cat}</div>
+        <div class="rep-dots" style="margin-bottom:8px;">${repDots}</div>
+        <div class="prob-stats">
+          Avg: <b style="color:${confColor(p.avgConf)}">${avgPct}%</b> &nbsp;|&nbsp; Reps: <b>${p.count}</b><br>
+          Best: <b>${(p.maxConf*100).toFixed(1)}%</b> &nbsp;|&nbsp; Worst: <b>${(p.minConf*100).toFixed(1)}%</b><br>
+          ✓ ${p.passCount} &nbsp;⚠ ${p.warnCount} &nbsp;✗ ${p.failCount}
+        </div>
+        <div class="prob-advice">${advice}</div>
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('probSection').style.display = 'none';
   }
 
-  // Chart 5: Avg conf by sign
-  const signLabels=Object.keys(labelAvgConf).sort((a,b)=>{
-    const avgA=labelAvgConf[a].reduce((x,y)=>x+y,0)/labelAvgConf[a].length;
-    const avgB=labelAvgConf[b].reduce((x,y)=>x+y,0)/labelAvgConf[b].length;
-    return avgB-avgA;
-  });
-  const signAvgs=signLabels.map(k=>+(labelAvgConf[k].reduce((a,b)=>a+b,0)/labelAvgConf[k].length*100).toFixed(1));
-  dc('avgConf');
-  charts['avgConf']=new Chart(document.getElementById('avgConfChart'),{
-    type:'bar',
-    data:{labels:signLabels,datasets:[{data:signAvgs,
-      backgroundColor:signAvgs.map(v=>v>=85?'rgba(52,211,153,0.75)':v>=70?'rgba(251,191,36,0.75)':'rgba(248,113,113,0.75)'),
-      borderColor:signAvgs.map(v=>v>=85?'#34d399':v>=70?'#fbbf24':'#f87171'),
-      borderWidth:1,borderRadius:5}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{x:{...bs.x,ticks:{...bs.x.ticks,maxRotation:40}},y:{...bs.y,min:0,max:100,ticks:{...bs.y.ticks,callback:v=>v+'%'}}}}
-  });
-  const reliableS=signLabels.filter((_,i)=>signAvgs[i]>=85).length;
-  const unreliableS=signLabels.filter((_,i)=>signAvgs[i]<70).length;
-  const worstS=signLabels[signAvgs.indexOf(Math.min(...signAvgs))];
-  document.getElementById('avgConfConcl').innerHTML=`
-    <span class="verdict ${unreliableS===0?'v-pass':reliableS>unreliableS?'v-part':'v-flag'}">${unreliableS===0?'All Signs Reliable':reliableS>0?`${reliableS} of ${signLabels.length} Signs Pass`:'Widespread Unreliability'}</span><br>
-    <b>${reliableS}</b> sign${reliableS!==1?'s':''} average ≥85% (Optimal). <b>${signLabels.filter((_,i)=>signAvgs[i]>=70&&signAvgs[i]<85).length}</b> are Borderline. <b>${unreliableS}</b> are Unreliable.
-    ${unreliableS>0?`<b>${worstS}</b> has the lowest average confidence and should be prioritized for retraining or additional data augmentation.`:''}
-    Signs averaging below 80% should undergo targeted data collection before the next evaluation cycle.`;
+  // Full table
+  document.getElementById('tableBody').innerHTML = seqRows.map((r, i) => {
+    const catCol = CAT_COLORS[r.glItem.cat] || 'var(--accent)';
+    if (!r.detected) {
+      return `<tr style="opacity:.4">
+        <td class="td-seq">${i+1}</td>
+        <td class="td-label">
+          <span style="width:3px;height:14px;border-radius:2px;background:${catCol};display:inline-block;"></span>
+          ${r.glItem.label}
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);">${r.glItem.cat}</span>
+        </td>
+        <td style="color:var(--text3)">—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td style="color:var(--text3)">—</td>
+        <td><span class="badge b-skip">Not seen</span></td>
+      </tr>`;
+    }
+    const confClass = r.conf >= 0.85 ? 'c-g' : r.conf >= 0.70 ? 'c-y' : 'c-r';
+    const fillCol = confColor(r.conf);
+    return `<tr>
+      <td class="td-seq">${i+1}</td>
+      <td class="td-label">
+        <span style="width:3px;height:14px;border-radius:2px;background:${catCol};display:inline-block;"></span>
+        ${r.glItem.label}
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);">${r.glItem.cat}</span>
+      </td>
+      <td style="color:${r.glItem.label === r.glItem.label ? 'var(--text)' : 'var(--red)'};font-weight:500">${r.glItem.label}</td>
+      <td><span class="badge b-blue">Rep ${r.repNum}</span> <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)">of ${r.totalReps}</span></td>
+      <td>
+        <div class="conf-mini">
+          <div class="conf-track">
+            <div class="conf-fill" style="width:${(r.conf*100).toFixed(0)}%;background:${fillCol}"></div>
+          </div>
+          <span class="td-conf ${confClass}">${(r.conf*100).toFixed(1)}%</span>
+        </div>
+      </td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)">${r.infMs}ms</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">${r.time}</td>
+      <td>${confBadge(r.conf)}</td>
+    </tr>`;
+  }).join('');
 
-  // Chart 6: Confidence bands
-  dc('confBand');
-  charts['confBand']=new Chart(document.getElementById('confBandChart'),{
-    type:'doughnut',
-    data:{labels:[`Optimal (≥85%) — ${high}`,`Marginal (70–84%) — ${mid}`,`At-Risk (<70%) — ${low}`],
-      datasets:[{data:[high,mid,low],
-        backgroundColor:['rgba(52,211,153,0.75)','rgba(251,191,36,0.75)','rgba(248,113,113,0.75)'],
-        borderColor:['#34d399','#fbbf24','#f87171'],borderWidth:2,hoverOffset:8}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
-      plugins:{legend:{display:true,position:'right',labels:{color:'#94a3b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:10,boxHeight:10}}}}
-  });
-  const atRiskPct=(low/gestures.length*100).toFixed(1);
-  document.getElementById('confBandConcl').innerHTML=`
-    <span class="verdict ${highRate>=80&&parseFloat(atRiskPct)<=10?'v-pass':highRate>=60?'v-part':'v-flag'}">${highRate>=80&&parseFloat(atRiskPct)<=10?'Deployment Benchmark Met':highRate>=60?'Approaching Target':'Below Deployment Threshold'}</span><br>
-    <b>${highRate}%</b> of gestures in Optimal Zone (target: &gt;80%). At-Risk: <b>${low} (${atRiskPct}%)</b> (target: &lt;10%).
-    ${highRate>=80&&parseFloat(atRiskPct)<=10?'The model meets the recommended deployment benchmarks for this session.'
-    :`Reducing At-Risk events below ${Math.ceil(gestures.length*0.10)} would indicate a production-ready profile. Continued sign-level iteration is recommended.`}`;
-
-  // STT
-  if(sttRows.length>0){
-    document.getElementById('sttSection').style.display='block';
-    document.getElementById('sttTableWrap').innerHTML=`<table>
-      <thead><tr><th>#</th><th>Time</th><th>Transcript</th><th>Environment</th><th>dBFS</th><th>Latency</th></tr></thead>
-      <tbody>${sttRows.map((s,i)=>{
-        const dv=parseFloat(s.stt_dbfs),dc2=dv>=-40?'var(--accent3)':dv>=-70?'var(--warn)':'#f87171';
-        return`<tr><td>${i+1}</td><td style="color:var(--muted)">${s.datetime?.slice(11,19)||''}</td>
-          <td>"${s.stt_transcript}"</td>
-          <td>${s.stt_environment==='quiet'?'<span class="badge b-gn">Quiet</span>':'<span class="badge b-wn">Noisy</span>'}</td>
-          <td style="color:${dc2}">${s.stt_dbfs}</td><td>${parseFloat(s.stt_latency_ms).toFixed(0)}ms</td></tr>`;
-      }).join('')}</tbody></table>`;
-    const sttLats=sttRows.map(s=>parseFloat(s.stt_latency_ms));
-    const avgSttLat=sttLats.reduce((a,b)=>a+b,0)/sttLats.length;
-    dc('sttLat');
-    charts['sttLat']=new Chart(document.getElementById('sttLatChart'),{
-      type:'bar',
-      data:{labels:sttRows.map((_,i)=>`#${i+1}`),datasets:[{data:sttLats,
-        backgroundColor:sttLats.map(v=>v<500?'rgba(52,211,153,0.7)':v<1000?'rgba(251,191,36,0.7)':'rgba(248,113,113,0.7)'),
-        borderColor:sttLats.map(v=>v<500?'#34d399':v<1000?'#fbbf24':'#f87171'),borderWidth:1,borderRadius:4}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{...bs.x},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+'ms'}}}}
-    });
-    const hasWER=sttRows.some(s=>s.stt_wer);
-    document.getElementById('sttConcl').innerHTML=`
-      <span class="verdict ${sttRows.length>=5?'v-pass':'v-part'}">${sttRows.length>=5?'Sufficient STT Data':'Limited STT Sample'}</span><br>
-      <b>${sttRows.length} STT event${sttRows.length!==1?'s':''}</b> recorded.
-      ${sttRows.length<5?`Only ${sttRows.length} transcription${sttRows.length!==1?'s':''} — insufficient for reliable evaluation. A minimum of 5–10 events across quiet and noisy conditions is recommended. `:''}
-      ${hasWER?`Avg WER: <b>${(sttRows.filter(s=>s.stt_wer).reduce((a,s)=>a+parseFloat(s.stt_wer),0)/sttRows.filter(s=>s.stt_wer).length*100).toFixed(1)}%</b>. `:'No WER computed (ground truth reference not provided). '}
-      Avg transcription latency: <b>${avgSttLat.toFixed(0)}ms</b>.`;
-    document.getElementById('sttLatConcl').innerHTML=`
-      <span class="verdict ${avgSttLat<500?'v-pass':avgSttLat<1000?'v-part':'v-flag'}">${avgSttLat<500?'Fast Transcription':avgSttLat<1000?'Acceptable Latency':'High Latency'}</span><br>
-      Average STT latency: <b>${avgSttLat.toFixed(0)}ms</b> across ${sttRows.length} event${sttRows.length!==1?'s':''}.
-      ${avgSttLat<500?'Transcription speed is well within real-time usability bounds for assistive communication.'
-      :avgSttLat<1000?'Latency is acceptable but may cause minor delays. Consider optimizing the Whisper model size or hardware resources.'
-      :'High latency detected — may significantly impair real-time usability. Review model complexity and audio chunk sizing.'}`;
-  }else{
-    document.getElementById('sttSection').style.display='none';
-  }
-
-  // Per-gesture bars
-  document.getElementById('confBars').innerHTML=gestures.map((g,i)=>{
-    const pct=(parseFloat(g.confidence)*100).toFixed(1);
-    const c=parseFloat(g.confidence)>=0.85?'#34d399':parseFloat(g.confidence)>=0.70?'#fbbf24':'#f87171';
-    const zone=parseFloat(g.confidence)>=0.85?'Optimal':parseFloat(g.confidence)>=0.70?'Marginal':'At-Risk';
-    return`<div class="cb-wrap">
-      <div class="cb-label">
-        <span>#${i+1} <b>${g.predicted_label}</b> <span style="color:var(--muted);font-size:9px">${g.datetime?.slice(11,19)||''}</span>
-          <span class="ztag" style="background:${c}22;color:${c};">${zone}</span></span>
-        <span style="color:${c};font-size:11px;">${pct}%</span>
+  // Category summary
+  const cats = [...new Set(GESTURE_LIST.map(g => g.cat))];
+  document.getElementById('catSummary').innerHTML = cats.map(cat => {
+    const signs = GESTURE_LIST.filter(g => g.cat === cat);
+    const catColor = CAT_COLORS[cat] || 'var(--accent)';
+    const signItems = signs.map(g => {
+      const s = labelSummary[g.label];
+      if (!s || s.count === 0) return `<div style="opacity:.4;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);">${g.label} — not seen</div>`;
+      const avgPct = (s.avgConf*100).toFixed(0);
+      const col = confColor(s.avgConf);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+        <div style="width:3px;height:12px;border-radius:2px;background:${col};flex-shrink:0;"></div>
+        <span style="font-size:12px;font-weight:500;color:var(--text);min-width:90px;">${g.label}</span>
+        <div style="width:80px;height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;flex-shrink:0;">
+          <div style="width:${avgPct}%;height:100%;background:${col};border-radius:99px;"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${col}">${avgPct}%</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)">${s.count}×</span>
+        <span class="rep-dots">${s.reps.map(r=>`<div class="rep-dot ${r.conf>=0.85?'pass':r.conf>=0.70?'warn':'fail'}" title="${(r.conf*100).toFixed(1)}%"></div>`).join('')}</span>
+      </div>`;
+    }).join('');
+    const catConfs = signs.flatMap(g => (byLabel[g.label]||[]).map(r => r.conf));
+    const catAvg = catConfs.length ? catConfs.reduce((a,b)=>a+b,0)/catConfs.length : null;
+    return `<div class="summary-box" style="border-left-color:${catColor};margin-bottom:14px;">
+      <div class="summary-title">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;color:${catColor};">${cat}</span>
+        ${catAvg !== null ? `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${confColor(catAvg)};">avg ${(catAvg*100).toFixed(1)}%</span>` : ''}
       </div>
-      <div class="cb-track"><div class="cb-fill" style="width:${pct}%;background:${c};"></div></div>
+      <div>${signItems}</div>
     </div>`;
   }).join('');
-  document.getElementById('perGestureConcl').innerHTML=`
-    <span class="verdict ${highRate>=80?'v-pass':'v-part'}">Generally ${highRate>=80?'Strong':'Acceptable'} — ${low>0?`${low} At-Risk Outlier${low!==1?'s':''}`:' No Outliers'}</span><br>
-    Session high: <b>#${confs.indexOf(Math.max(...confs))+1} ${topG.predicted_label} at ${(Math.max(...confs)*100).toFixed(1)}%</b>.
-    Session low: <b>#${confs.indexOf(Math.min(...confs))+1} ${botG.predicted_label} at ${(Math.min(...confs)*100).toFixed(1)}%</b>.
-    ${low>0?'At-Risk detections likely reflect transient factors (occlusion, lighting, posture) rather than fundamental model failures — cross-reference against session video if available.':'All detections meet or approach reliability thresholds, confirming consistent signing conditions.'}`;
 
-  // TTS Table
-  document.getElementById('ttsTableBody').innerHTML=ttsRows.map((t,i)=>{
-    const dv=parseFloat(t.tts_dbfs);
-    const dc2=dv>=-40?'var(--accent3)':dv>=-70?'var(--warn)':'#f87171';
-    const audTag=dv>=-40?'<span class="badge b-gn">Audible ✓</span>':dv>=-70?'<span class="badge b-wn">Low</span>':'<span class="badge b-rd">Near-Silent</span>';
-    const lat=parseFloat(t.tts_latency_ms);
-    return`<tr><td>${i+1}</td><td style="color:var(--muted)">${t.datetime?.slice(11,19)||''}</td>
-      <td>${(t.tts_text||'').replace(/"/g,'')}</td>
-      <td style="color:${dc2}">${t.tts_dbfs} dBFS</td>
-      <td>${lat>0?`<span style="color:var(--warn)">${lat}ms</span>`:'<span style="color:var(--muted)">0ms</span>'}</td>
-      <td>${audTag}</td></tr>`;
-  }).join('');
-  document.getElementById('ttsConcl').innerHTML=`
-    <span class="verdict ${audible===ttsRows.length?'v-pass':audible>ttsRows.length*0.6?'v-part':'v-flag'}">${audible===ttsRows.length?'All Outputs Audible':audible>ttsRows.length*0.6?'NLG Functional — Audio Needs Improvement':'Critical Audio Issues'}</span><br>
-    <b>${ttsRows.length}</b> TTS sentence${ttsRows.length!==1?'s':''} produced. <b>${audible} of ${ttsRows.length}</b> (${Math.round(audible/ttsRows.length*100)}%) fall within the audible benchmark.
-    ${audible<ttsRows.length?'Audio normalization targeting -20 to -35 dBFS using AGC or post-processing is recommended. The NLG sentence construction layer is functional.':'TTS pipeline is performing well across both language generation and audio rendering.'}`;
-
-  // Key findings (dynamic)
-  const findings=[];
-  findings.push({icon:'✓',bg:'rgba(56,189,248,.15)',c:'var(--accent)',text:`<b>End-to-End Pipeline Operational.</b> ${gestures.length} gestures detected, ${ttsRows.length} TTS sentences produced without system failure.`});
-  if(high/confs.length>=0.75)findings.push({icon:'↑',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>Strong Confidence on Dominant Signs.</b> ${highRate}% of detections exceeded the 85% threshold. The model generalizes well to frequently signed labels.`});
-  if(low>0)findings.push({icon:'⚠',bg:'rgba(251,191,36,.15)',c:'var(--warn)',text:`<b>At-Risk Detections Present.</b> ${low} gesture${low!==1?'s':''} scored below 70%. Affected: ${[...new Set(gestures.filter(g=>parseFloat(g.confidence)<0.70).map(g=>g.predicted_label))].join(', ')}.`});
-  if(avgDbfs!==null&&avgDbfs<-40)findings.push({icon:'!',bg:'rgba(248,113,113,.15)',c:'var(--danger)',text:`<b>TTS Audio Volume Inconsistent.</b> Average ${avgDbfs.toFixed(1)} dBFS falls below the audible benchmark. Only ${audible}/${ttsRows.length} outputs are clearly audible.`});
-  else if(avgDbfs!==null)findings.push({icon:'🔊',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>TTS Audio Within Audible Range.</b> Average ${avgDbfs.toFixed(1)} dBFS meets target. ${audible}/${ttsRows.length} outputs are clearly audible.`});
-  if(avgInf<100)findings.push({icon:'⏱',bg:'rgba(167,139,250,.15)',c:'var(--accent2)',text:`<b>Inference Latency Meets Real-Time Bounds.</b> Average ${avgInf.toFixed(1)}ms confirms suitability for live assistive communication.`});
-  if(!gestures.some(g=>g.ground_truth))findings.push({icon:'∅',bg:'rgba(251,146,60,.15)',c:'var(--accent4)',text:`<b>No Ground Truth Provided.</b> Formal Accuracy, Precision, Recall, and F1 cannot be computed. Annotating gestures is required for quantitative thesis evaluation.`});
-  if(!sttRows.length)findings.push({icon:'🎙',bg:'rgba(100,116,139,.15)',c:'var(--muted)',text:`<b>STT Pipeline Untested.</b> Zero STT events captured. Dedicated STT sessions should be run to evaluate the speech-to-text component.`});
-  document.getElementById('keyFindings').innerHTML=`
-    <div class="obs-title">🔬 Summary of Testing Session Results</div>
-    <div class="obs-list">${findings.map(f=>`<div class="obs-item">
-      <div class="obs-icon" style="background:${f.bg};color:${f.c}">${f.icon}</div>
-      <div class="obs-text">${f.text}</div></div>`).join('')}</div>`;
-
-  // Recommendations (dynamic)
-  const recs=[];
-  if(!gestures.some(g=>g.ground_truth))recs.push('Annotate test sessions with <b>ground truth labels</b> on all gesture events to enable Accuracy, Precision, Recall, and F1-Score computation — the core quantitative thesis metrics.');
-  if(unreliableS>0)recs.push(`Augment training data for <b>${signLabels.filter((_,i)=>signAvgs[i]<70).join(', ')}</b> — signs averaging below 70%. Add varied lighting conditions, signing angles, and multiple signer profiles.`);
-  if(avgDbfs!==null&&audible<ttsRows.length)recs.push('Implement <b>TTS audio normalization</b> targeting -20 to -35 dBFS using Automatic Gain Control (AGC) or post-processing normalization before speaker output rendering.');
-  if(low>0)recs.push('Apply a <b>confidence threshold filter (≥0.70)</b> to suppress At-Risk predictions from entering the sentence builder, reducing erroneous tokens in TTS output.');
-  if(!sttRows.length)recs.push('Conduct dedicated sessions to exercise the <b>STT pipeline</b> — zero events were captured, leaving that component entirely untested in this session.');
-  const underRep=sortedLabels.filter(([,v])=>v<5);
-  if(underRep.length)recs.push(`Increase test coverage to <b>≥5 repetitions per sign label</b>. Currently underrepresented: ${underRep.map(([k,v])=>`${k} (${v}×)`).join(', ')}.`);
-  if(Object.keys(allSessions).length===1)recs.push('Upload additional session CSVs from your <b>logs/ folder</b> to enable cross-session trend analysis and track confidence improvements over time.');
-  document.getElementById('recommendations').innerHTML=`
-    <div class="obs-title">📋 Recommended Actions for Next Testing Phase</div>
-    <div class="obs-list">${recs.map((r,i)=>`<div class="obs-item">
-      <div class="obs-icon" style="background:rgba(167,139,250,.15);color:var(--accent2)">${i+1}</div>
-      <div class="obs-text">${r}</div></div>`).join('')}</div>`;
-
-  document.getElementById('footerSessions').textContent=Object.keys(allSessions).length;
-  document.getElementById('footerEvents').textContent=rows.length;
+  // Left panel gesture list
+  renderGestureList(labelSummary);
 }
 
-document.getElementById('no-data').style.display='block';
-document.getElementById('dashboard').style.display='none';
+function renderGestureList(labelSummary) {
+  const cats = [...new Set(GESTURE_LIST.map(g => g.cat))];
+  let html = '';
+  cats.forEach(cat => {
+    const catColor = CAT_COLORS[cat] || 'var(--accent)';
+    html += `<div class="cat-sep" style="color:${catColor};">${cat}</div>`;
+    GESTURE_LIST.filter(g => g.cat === cat).forEach(g => {
+      const s = labelSummary ? labelSummary[g.label] : null;
+      let cls = 'g-none', dotCls = '', repTag = '';
+      if (s && s.count > 0) {
+        if (s.avgConf >= 0.85) { cls = 'g-pass'; dotCls = 'g-pass'; }
+        else if (s.avgConf >= 0.70) { cls = 'g-warn'; dotCls = 'g-warn'; }
+        else { cls = 'g-fail'; dotCls = 'g-fail'; }
+        const repClass = s.count >= 5 ? 'good' : s.count >= 3 ? 'warn' : 'fail';
+        repTag = `<span class="rep-tag ${repClass}">${s.count}×</span>`;
+        const avgPct = (s.avgConf * 100).toFixed(0);
+        const fillCol = confColor(s.avgConf);
+        html += `<div class="gesture-item ${cls}">
+          <span class="g-idx">${g.id}</span>
+          <div class="g-dot"></div>
+          <div class="g-info">
+            <div class="g-name">${g.label} ${repTag}</div>
+            <div class="g-conf-bar"><div class="g-conf-fill" style="width:${avgPct}%;background:${fillCol}"></div></div>
+            <div class="g-stats">
+              <span>avg ${avgPct}%</span>
+              <span>best ${(s.maxConf*100).toFixed(0)}%</span>
+              <span>worst ${(s.minConf*100).toFixed(0)}%</span>
+            </div>
+          </div>
+        </div>`;
+      } else {
+        html += `<div class="gesture-item g-none">
+          <span class="g-idx">${g.id}</span>
+          <div class="g-dot"></div>
+          <div class="g-info">
+            <div class="g-name">${g.label} <span class="rep-tag">not seen</span></div>
+          </div>
+        </div>`;
+      }
+    });
+  });
+  document.getElementById('gestureList').innerHTML = html;
+  document.getElementById('gestureBadge').textContent = labelSummary
+    ? `${GESTURE_LIST.filter(g => labelSummary[g.label]?.count > 0).length} / ${GESTURE_LIST.length} seen`
+    : `${GESTURE_LIST.length} signs`;
+}
+
+function clearData() {
+  sessionData = null;
+  document.getElementById('noData').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('fileInfo').style.display = 'none';
+  document.getElementById('uploadBadge').textContent = 'No file';
+  fileInput.value = '';
+  renderGestureList(null);
+}
+
+// ─── TOOLTIP ─────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, text) {
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = text.replace(/\n/g, '<br>');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  tooltip.style.left = (e.clientX + 12) + 'px';
+  tooltip.style.top = (e.clientY - 8) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+document.addEventListener('mousemove', moveTooltip);
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderGestureList(null);
 </script>
 </body>
 </html>
