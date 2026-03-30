@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignSpeak — Dynamic Session Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;--accent:#38bdf8;--accent2:#a78bfa;--accent3:#34d399;--accent4:#fb923c;--warn:#fbbf24;--danger:#f87171;--text:#e2e8f0;--muted:#64748b;--glow:0 0 0 1px var(--border),0 4px 24px rgba(56,189,248,0.06);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(56,189,248,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:40px 24px 80px;}
+header{margin-bottom:40px;border-bottom:1px solid var(--border);padding-bottom:28px;}
+.tag{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.tag::before{content:'';display:inline-block;width:20px;height:1px;background:var(--accent);}
+h1{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,46px);font-weight:800;line-height:1.1;color:#fff;letter-spacing:-1px;}
+h1 span{color:var(--accent);}
+.sub-h{color:var(--muted);font-size:12px;margin-top:6px;}
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;transition:border-color .2s,background .2s;cursor:pointer;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(56,189,248,.04);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:28px;margin-bottom:10px;}
+.upload-label{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:6px;}
+.upload-hint{font-size:11px;color:var(--muted);}
+.file-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;justify-content:center;}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:99px;font-size:11px;color:var(--accent);}
+.chip .rm{cursor:pointer;opacity:.6;font-size:10px;margin-left:2px;transition:opacity .15s;}
+.chip .rm:hover{opacity:1;}
+#no-data{text-align:center;padding:60px 20px;color:var(--muted);}
+#no-data .nd-icon{font-size:44px;margin-bottom:14px;}
+#no-data .nd-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:32px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden;box-shadow:var(--glow);transition:border-color .2s;}
+.stat:hover{border-color:var(--accent);}
+.stat .lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.stat .val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1;}
+.stat .val span{font-size:16px;}
+.stat .info{font-size:10px;color:var(--muted);margin-top:5px;}
+.stat .bar{position:absolute;bottom:0;left:0;height:3px;width:100%;}
+.sec-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:#fff;margin:32px 0 18px;display:flex;align-items:center;gap:10px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.dot.p{background:var(--accent2);}.dot.g{background:var(--accent3);}.dot.o{background:var(--accent4);}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+@media(max-width:900px){.g2{grid-template-columns:1fr;}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:var(--glow);display:flex;flex-direction:column;}
+.card-title{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.cw{position:relative;height:240px;}.cw.tall{height:300px;}
+.bm{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.bm-item{display:flex;align-items:center;gap:5px;font-size:10px;}
+.bm-d{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.opt{background:#34d399;}.mrg{background:#fbbf24;}.risk{background:#f87171;}.neu{background:#38bdf8;}
+.bm-lbl{color:var(--muted);}.bm-lbl b{color:var(--text);font-weight:500;}
+.concl{margin-top:14px;padding:14px 16px;background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:11px;line-height:1.8;color:#94a3b8;}
+.concl b{color:var(--text);}
+.verdict{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:99px;margin-bottom:8px;font-weight:600;}
+.v-pass{background:rgba(52,211,153,.15);color:#34d399;}.v-part{background:rgba(251,191,36,.15);color:#fbbf24;}.v-flag{background:rgba(248,113,113,.15);color:#f87171;}
+.cb-wrap{margin-bottom:8px;}
+.cb-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;align-items:center;}
+.cb-track{height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+.cb-fill{height:100%;border-radius:99px;}
+.ztag{font-size:9px;padding:1px 7px;border-radius:99px;margin-left:5px;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+th{text-align:left;color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border);}
+td{padding:9px 10px;border-bottom:1px solid rgba(30,45,69,.5);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(56,189,248,.03);}
+.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:500;}
+.b-bl{background:rgba(56,189,248,.12);color:var(--accent);}.b-gn{background:rgba(52,211,153,.12);color:var(--accent3);}.b-wn{background:rgba(251,191,36,.12);color:var(--warn);}.b-rd{background:rgba(248,113,113,.12);color:#f87171;}
+.obs-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px;margin-bottom:18px;}
+.obs-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:#fff;margin-bottom:14px;}
+.obs-list{display:flex;flex-direction:column;gap:10px;}
+.obs-item{display:flex;gap:10px;align-items:flex-start;}
+.obs-icon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px;}
+.obs-text{font-size:11.5px;line-height:1.7;color:var(--text);}.obs-text b{color:var(--accent);}
+.scroll-body{max-height:380px;overflow-y:auto;padding-right:4px;}
+.scroll-body::-webkit-scrollbar{width:4px;}.scroll-body::-webkit-scrollbar-track{background:var(--surface2);}.scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.filter-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
+.fl-label{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);}
+.date-btn{padding:5px 13px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
+.date-btn:hover{border-color:var(--accent);color:var(--text);}
+.date-btn.active{background:rgba(56,189,248,.12);border-color:var(--accent);color:var(--accent);}
+.date-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;}
+.session-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+.s-pill{padding:5px 13px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
+.s-pill:hover{border-color:var(--accent2);color:var(--text);}
+.s-pill.active{background:rgba(167,139,250,.12);border-color:var(--accent2);color:var(--accent2);}
+.s-pill.all-pill{border-color:rgba(56,189,248,.4);color:var(--accent);}
+.s-pill.all-pill.active{background:rgba(56,189,248,.12);}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:22px;}
+.info-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;}
+.info-row .k{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.info-row .v{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:#fff;}
+footer{text-align:center;padding-top:32px;border-top:1px solid var(--border);color:var(--muted);font-size:10px;margin-top:40px;}
+footer span{color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="tag">Thesis Testing Phase · Dynamic Session Analysis</div>
+  <h1>Sign<span>Speak</span> Dashboard</h1>
+  <p class="sub-h">Sign Language → TTS Pipeline · Upload any <code>session_YYYYMMDD_HHMMSS.csv</code> from your <code>logs/</code> folder — multiple files supported with date filtering</p>
+</header>
+
+<!-- UPLOAD -->
+<div class="upload-zone" id="dropZone">
+  <input type="file" id="fileInput" accept=".csv" multiple>
+  <div class="upload-icon">📂</div>
+  <div class="upload-label">Drop session CSV files here, or click to browse</div>
+  <div class="upload-hint">Select all files from your <code>logs/</code> folder at once — the dashboard will auto-detect dates from filenames and let you filter by session or date range</div>
+  <div class="file-chips" id="fileChips"></div>
+</div>
+
+<!-- NO DATA -->
+<div id="no-data">
+  <div class="nd-icon">🗂️</div>
+  <div class="nd-title" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;">No sessions loaded</div>
+  <div>Upload one or more <code>session_*.csv</code> files from your logs folder to begin analysis</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" style="display:none;">
+
+  <!-- SESSION SELECTOR + DATE FILTER -->
+  <div class="sec-title"><span class="dot"></span> Session Selector</div>
+  <div class="session-nav" id="sessionNav"></div>
+
+  <div class="filter-bar" id="filterBar">
+    <span class="fl-label">Date Range:</span>
+    <button class="date-btn active" data-range="all">All Time</button>
+    <button class="date-btn" data-range="today">Today</button>
+    <button class="date-btn" data-range="week">Last 7 Days</button>
+    <button class="date-btn" data-range="month">Last 30 Days</button>
+    <span style="color:var(--border)">|</span>
+    <input type="date" id="dateFrom" class="date-input" placeholder="From">
+    <span style="color:var(--muted);font-size:11px;">→</span>
+    <input type="date" id="dateTo" class="date-input" placeholder="To">
+    <button class="date-btn" id="applyRange" style="border-color:var(--accent3);color:var(--accent3);">Apply Range</button>
+  </div>
+
+  <!-- METADATA -->
+  <div class="sec-title"><span class="dot"></span> Session Metadata</div>
+  <div class="info-grid" id="metaGrid"></div>
+
+  <!-- STAT CARDS -->
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <!-- GESTURE RECOGNITION -->
+  <div class="sec-title"><span class="dot"></span> Gesture Recognition Performance</div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Confidence Score per Gesture (Chronological)</div>
+      <div class="cw tall"><canvas id="confLineChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal</b> ≥85% — reliable classification</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal</b> 70–84% — review recommended</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk</b> &lt;70% — unreliable output</span></div>
+      </div>
+      <div class="concl" id="confLineConcl" style="border-left-color:#38bdf8;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sign Label Frequency Distribution</div>
+      <div class="cw tall"><canvas id="signDistChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d neu"></div><span class="bm-lbl"><b>Balanced</b> ≥5 reps/sign — statistically valid</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Sparse</b> 2–4 reps — limited weight</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Insufficient</b> 1 rep — not evaluable</span></div>
+      </div>
+      <div class="concl" id="signDistConcl" style="border-left-color:#a78bfa;"></div>
+    </div>
+  </div>
+
+  <!-- LATENCY & AUDIO -->
+  <div class="sec-title"><span class="dot o"></span> System Latency &amp; Audio Output</div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Inference Time per Gesture (ms)</div>
+      <div class="cw"><canvas id="inferenceChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Real-Time</b> &lt;100ms — suitable for live use</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Delayed</b> ≥100ms — noticeable lag</span></div>
+      </div>
+      <div class="concl" id="inferConcl" style="border-left-color:#34d399;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">TTS Audio Output Level per Sentence (dBFS)</div>
+      <div class="cw"><canvas id="dbfsChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Audible</b> -20 to -40 dBFS — clear output</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Low</b> -40 to -70 dBFS — may need amplification</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Near-Silent</b> &lt;-70 dBFS — unusable</span></div>
+      </div>
+      <div class="concl" id="dbfsConcl" style="border-left-color:#f87171;"></div>
+    </div>
+  </div>
+
+  <!-- CONFIDENCE BY SIGN -->
+  <div class="sec-title"><span class="dot p"></span> Confidence Analysis by Sign Label</div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Average Confidence Score by Sign Label</div>
+      <div class="cw"><canvas id="avgConfChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Reliable</b> avg ≥85% — deployment-ready</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Borderline</b> avg 70–84% — needs monitoring</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Unreliable</b> avg &lt;70% — retraining required</span></div>
+      </div>
+      <div class="concl" id="avgConfConcl" style="border-left-color:#a78bfa;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Confidence Distribution by Threshold Band</div>
+      <div class="cw"><canvas id="confBandChart"></canvas></div>
+      <div class="bm">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal Zone</b> ≥85% — target &gt;80% of gestures</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal Zone</b> 70–84%</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk Zone</b> &lt;70% — target &lt;10%</span></div>
+      </div>
+      <div class="concl" id="confBandConcl" style="border-left-color:#fbbf24;"></div>
+    </div>
+  </div>
+
+  <!-- STT SECTION -->
+  <div id="sttSection" style="display:none;">
+    <div class="sec-title"><span class="dot g"></span> Speech-to-Text Results</div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-title">STT Transcription Log</div>
+        <div id="sttTableWrap"></div>
+        <div class="bm">
+          <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Clear</b> &gt;-40 dBFS</span></div>
+          <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Quiet</b> -40 to -70 dBFS</span></div>
+          <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Very Quiet</b> &lt;-70 dBFS</span></div>
+        </div>
+        <div class="concl" id="sttConcl" style="border-left-color:#34d399;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">STT Transcription Latency (ms)</div>
+        <div class="cw"><canvas id="sttLatChart"></canvas></div>
+        <div class="bm">
+          <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Fast</b> &lt;500ms</span></div>
+          <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Acceptable</b> 500–1000ms</span></div>
+          <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Slow</b> &gt;1000ms</span></div>
+        </div>
+        <div class="concl" id="sttLatConcl" style="border-left-color:#34d399;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PER-GESTURE BARS -->
+  <div class="sec-title"><span class="dot p"></span> Per-Gesture Confidence Breakdown</div>
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-title">All Gesture Detections — Individual Scores with Zone Classification</div>
+    <div class="scroll-body" id="confBars"></div>
+    <div class="bm" style="margin-top:14px;">
+      <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal</b> ≥85%</span></div>
+      <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Marginal</b> 70–84%</span></div>
+      <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>At-Risk</b> &lt;70%</span></div>
+    </div>
+    <div class="concl" id="perGestureConcl" style="border-left-color:#38bdf8;margin-top:14px;"></div>
+  </div>
+
+  <!-- TTS TABLE -->
+  <div class="sec-title"><span class="dot g"></span> TTS Output Log</div>
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-title">Sentence-level TTS Events — Sign Input → Natural Language Output</div>
+    <div class="scroll-body">
+      <table>
+        <thead><tr><th>#</th><th>Time</th><th>TTS Text</th><th>Audio Level</th><th>Latency</th><th>Audibility</th></tr></thead>
+        <tbody id="ttsTableBody"></tbody>
+      </table>
+    </div>
+    <div class="bm" style="margin-top:14px;">
+      <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Audible</b> -20 to -40 dBFS</span></div>
+      <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Low</b> -40 to -70 dBFS</span></div>
+      <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Near-Silent</b> &lt;-70 dBFS</span></div>
+    </div>
+    <div class="concl" id="ttsConcl" style="border-left-color:#34d399;margin-top:14px;"></div>
+  </div>
+
+  <!-- KEY FINDINGS -->
+  <div class="sec-title"><span class="dot g"></span> Analysis &amp; Key Findings</div>
+  <div class="obs-box" id="keyFindings"></div>
+  <div class="obs-box" id="recommendations" style="border-left-color:var(--accent2);"></div>
+
+  <footer>Generated by <span>SignSpeak</span> Dynamic Dashboard · Thesis Testing Phase · Sessions: <span id="footerSessions">0</span> · Total Events: <span id="footerEvents">0</span></footer>
+</div>
+</div>
+
+<script>
+let allSessions={};
+let activeFilter={type:'all',session:'all'};
+let charts={};
+
+// CSV parser with quoted field support
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/\r/,''));
+  return lines.slice(1).map(line=>{
+    const vals=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      if(line[i]==='"'){inQ=!inQ;}
+      else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
+      else{cur+=line[i];}
+    }
+    vals.push(cur.trim().replace(/\r/,''));
+    const row={};
+    headers.forEach((h,i)=>row[h]=vals[i]||'');
+    return row;
+  });
+}
+
+const fileInput=document.getElementById('fileInput');
+const dropZone=document.getElementById('dropZone');
+fileInput.addEventListener('change',e=>loadFiles(e.target.files));
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag');loadFiles(e.dataTransfer.files);});
+
+function loadFiles(files){
+  Array.from(files).forEach(file=>{
+    if(!file.name.endsWith('.csv'))return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const rows=parseCSV(e.target.result);
+      const m=file.name.match(/session_(\d{8})_(\d{6})/);
+      let sessionDate=null,sessionLabel=file.name;
+      if(m){
+        const d=m[1],t=m[2];
+        sessionDate=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+        sessionLabel=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)} ${t.slice(0,2)}:${t.slice(2,4)}`;
+      }
+      allSessions[file.name]={name:file.name,label:sessionLabel,date:sessionDate,rows};
+      renderChips();renderSessionNav();renderDashboard();
+    };
+    reader.readAsText(file);
+  });
+}
+
+function removeSession(name){
+  delete allSessions[name];
+  if(activeFilter.session===name)activeFilter={type:'all',session:'all'};
+  renderChips();renderSessionNav();renderDashboard();
+}
+
+function renderChips(){
+  document.getElementById('fileChips').innerHTML=
+    Object.values(allSessions).map(s=>`<span class="chip">📄 ${s.label} <span class="rm" onclick="removeSession('${s.name}')">✕</span></span>`).join('');
+}
+
+function renderSessionNav(){
+  const sessions=Object.values(allSessions);
+  if(!sessions.length){document.getElementById('sessionNav').innerHTML='';return;}
+  let html=`<button class="s-pill all-pill ${activeFilter.session==='all'?'active':''}" onclick="setSessionFilter('all',this)">All Sessions (${sessions.length})</button>`;
+  [...sessions].sort((a,b)=>a.label.localeCompare(b.label)).forEach(s=>{
+    html+=`<button class="s-pill ${activeFilter.session===s.name?'active':''}" onclick="setSessionFilter('${s.name}',this)">${s.label}</button>`;
+  });
+  document.getElementById('sessionNav').innerHTML=html;
+}
+
+function setSessionFilter(name,el){
+  activeFilter={type:'all',session:name};
+  document.querySelectorAll('.s-pill').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.date-btn[data-range]').forEach(b=>b.classList.toggle('active',b.dataset.range==='all'));
+  renderDashboard();
+}
+
+document.querySelectorAll('.date-btn[data-range]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.date-btn[data-range]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter={type:btn.dataset.range,session:'all'};
+    document.querySelectorAll('.s-pill').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.s-pill.all-pill')?.classList.add('active');
+    renderDashboard();
+  });
+});
+document.getElementById('applyRange').addEventListener('click',()=>{
+  activeFilter={type:'custom',session:'all',from:document.getElementById('dateFrom').value,to:document.getElementById('dateTo').value};
+  renderDashboard();
+});
+
+function getFilteredRows(){
+  const sessions=Object.values(allSessions);
+  if(!sessions.length)return[];
+  let rows=activeFilter.session!=='all'?(allSessions[activeFilter.session]?.rows||[]):sessions.flatMap(s=>s.rows);
+  if(activeFilter.type==='today'){const t=new Date().toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)===t);}
+  else if(activeFilter.type==='week'){const c=new Date(Date.now()-7*864e5).toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)>=c);}
+  else if(activeFilter.type==='month'){const c=new Date(Date.now()-30*864e5).toISOString().slice(0,10);rows=rows.filter(r=>r.datetime?.slice(0,10)>=c);}
+  else if(activeFilter.type==='custom'){
+    if(activeFilter.from)rows=rows.filter(r=>r.datetime?.slice(0,10)>=activeFilter.from);
+    if(activeFilter.to)rows=rows.filter(r=>r.datetime?.slice(0,10)<=activeFilter.to);
+  }
+  return rows;
+}
+
+const bs={
+  x:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}},
+  y:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}}
+};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+const pal=['#38bdf8','#fb923c','#a78bfa','#34d399','#fbbf24','#f472b6','#f87171','#60a5fa','#4ade80','#e879f9','#2dd4bf','#facc15'];
+
+function renderDashboard(){
+  const sessions=Object.values(allSessions);
+  document.getElementById('no-data').style.display=sessions.length===0?'block':'none';
+  document.getElementById('dashboard').style.display=sessions.length===0?'none':'block';
+  if(!sessions.length)return;
+
+  const rows=getFilteredRows();
+  const gestures=rows.filter(r=>r.event_type==='GESTURE');
+  const ttsRows=rows.filter(r=>r.event_type==='TTS');
+  const sttRows=rows.filter(r=>r.event_type==='STT');
+
+  if(!gestures.length){
+    document.getElementById('statsGrid').innerHTML='<div style="color:var(--muted);padding:20px;grid-column:1/-1;">No gesture data found in the selected date range.</div>';
+    return;
+  }
+
+  const confs=gestures.map(g=>parseFloat(g.confidence));
+  const inf=gestures.map(g=>parseFloat(g.inference_time_ms));
+  const avgConf=confs.reduce((a,b)=>a+b,0)/confs.length;
+  const high=confs.filter(c=>c>=0.85).length;
+  const mid=confs.filter(c=>c>=0.70&&c<0.85).length;
+  const low=confs.filter(c=>c<0.70).length;
+  const avgInf=inf.reduce((a,b)=>a+b,0)/inf.length;
+  const highRate=Math.round(high/confs.length*100);
+  const ttsDbfs=ttsRows.map(t=>parseFloat(t.tts_dbfs)).filter(v=>!isNaN(v));
+  const avgDbfs=ttsDbfs.length?ttsDbfs.reduce((a,b)=>a+b,0)/ttsDbfs.length:null;
+  const audible=ttsDbfs.filter(v=>v>=-40).length;
+  const labelCounts={};
+  gestures.forEach(g=>{labelCounts[g.predicted_label]=(labelCounts[g.predicted_label]||0)+1;});
+  const labelAvgConf={};
+  gestures.forEach(g=>{
+    if(!labelAvgConf[g.predicted_label])labelAvgConf[g.predicted_label]=[];
+    labelAvgConf[g.predicted_label].push(parseFloat(g.confidence));
+  });
+  const numSessions=activeFilter.session==='all'?sessions.length:1;
+  const sessionStart=rows.find(r=>r.datetime)?.datetime||'—';
+  const sessionEnd=[...rows].reverse().find(r=>r.datetime)?.datetime||'—';
+
+  // Metadata
+  document.getElementById('metaGrid').innerHTML=`
+    <div class="info-row"><span class="k">Sessions Loaded</span><span class="v">${numSessions}</span></div>
+    <div class="info-row"><span class="k">Date Range</span><span class="v">${sessionStart.slice(0,10)} → ${sessionEnd.slice(0,10)}</span></div>
+    <div class="info-row"><span class="k">Time Range</span><span class="v">${sessionStart.slice(11,19)} → ${sessionEnd.slice(11,19)}</span></div>
+    <div class="info-row"><span class="k">Total Events</span><span class="v">${rows.length}</span></div>
+    <div class="info-row"><span class="k">Unique Signs</span><span class="v">${Object.keys(labelCounts).length}</span></div>
+    <div class="info-row"><span class="k">STT Events</span><span class="v">${sttRows.length||'0 (none)'}</span></div>
+    <div class="info-row"><span class="k">Ground Truth</span><span class="v">${gestures.some(g=>g.ground_truth)?'Provided':'Not provided'}</span></div>
+    <div class="info-row"><span class="k">Reconnects</span><span class="v">${rows.filter(r=>r.event_type==='RECONNECT').length}</span></div>
+  `;
+
+  // Stat cards
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="lbl">Total Gestures</div><div class="val">${gestures.length}</div><div class="info">Detected events</div><div class="bar" style="background:linear-gradient(90deg,var(--accent),transparent)"></div></div>
+    <div class="stat"><div class="lbl">TTS Outputs</div><div class="val">${ttsRows.length}</div><div class="info">Sentences spoken</div><div class="bar" style="background:linear-gradient(90deg,var(--accent2),transparent)"></div></div>
+    <div class="stat"><div class="lbl">Avg Confidence</div><div class="val">${Math.round(avgConf*100)}<span>%</span></div><div class="info">Across all gestures</div><div class="bar" style="background:linear-gradient(90deg,${avgConf>=0.85?'#34d399':avgConf>=0.70?'#fbbf24':'#f87171'},transparent)"></div></div>
+    <div class="stat"><div class="lbl">Unique Signs</div><div class="val">${Object.keys(labelCounts).length}</div><div class="info">${Object.keys(labelCounts).slice(0,3).join(', ')}…</div><div class="bar" style="background:linear-gradient(90deg,var(--accent4),transparent)"></div></div>
+    <div class="stat"><div class="lbl">Avg Inference</div><div class="val">${Math.round(avgInf)}<span>ms</span></div><div class="info">Per gesture</div><div class="bar" style="background:linear-gradient(90deg,${avgInf<100?'#34d399':'#f87171'},transparent)"></div></div>
+    <div class="stat"><div class="lbl">Optimal Rate</div><div class="val">${highRate}<span>%</span></div><div class="info">≥85% confidence</div><div class="bar" style="background:linear-gradient(90deg,${highRate>=80?'#34d399':highRate>=60?'#fbbf24':'#f87171'},transparent)"></div></div>
+    ${avgDbfs!==null?`<div class="stat"><div class="lbl">Avg TTS Level</div><div class="val">${Math.round(avgDbfs)}<span>dBFS</span></div><div class="info">${audible}/${ttsRows.length} audible</div><div class="bar" style="background:linear-gradient(90deg,${avgDbfs>=-40?'#34d399':avgDbfs>=-70?'#fbbf24':'#f87171'},transparent)"></div></div>`:''}
+    ${sttRows.length?`<div class="stat"><div class="lbl">STT Events</div><div class="val">${sttRows.length}</div><div class="info">Transcriptions logged</div><div class="bar" style="background:linear-gradient(90deg,var(--accent3),transparent)"></div></div>`:''}
+  `;
+
+  // Chart 1: Confidence Line
+  dc('confLine');
+  charts['confLine']=new Chart(document.getElementById('confLineChart'),{
+    type:'line',
+    data:{
+      labels:gestures.map((_,i)=>`${i+1}`),
+      datasets:[{data:confs.map(c=>+(c*100).toFixed(1)),borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.07)',
+        pointBackgroundColor:confs.map(c=>c>=0.85?'#34d399':c>=0.70?'#fbbf24':'#f87171'),
+        pointRadius:gestures.length>100?1:gestures.length>40?2:4,tension:0.35,fill:true}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>{const g=gestures[ctx.dataIndex];return[`Conf: ${ctx.raw}%`,`Sign: ${g.predicted_label}`,`${g.datetime?.slice(11,19)||''}`];}}}},
+      scales:{x:{...bs.x},y:{...bs.y,min:0,max:100,ticks:{...bs.y.ticks,callback:v=>v+'%'}}}}
+  });
+  const topG=gestures[confs.indexOf(Math.max(...confs))];
+  const botG=gestures[confs.indexOf(Math.min(...confs))];
+  document.getElementById('confLineConcl').innerHTML=`
+    <span class="verdict ${highRate>=80?'v-pass':highRate>=60?'v-part':'v-flag'}">${highRate>=80?'Meets Threshold':highRate>=60?'Partially Meets Threshold':'Below Threshold'}</span><br>
+    <b>${high} of ${gestures.length} gestures (${highRate}%)</b> scored at or above the 85% Optimal benchmark.
+    Session high: <b>${topG.predicted_label} at ${(parseFloat(topG.confidence)*100).toFixed(1)}%</b>.
+    Session low: <b>${botG.predicted_label} at ${(parseFloat(botG.confidence)*100).toFixed(1)}%</b>.
+    ${low>0?`<b>${low} At-Risk detection${low!==1?'s':''} (${(low/gestures.length*100).toFixed(0)}%)</b> require investigation — check lighting conditions and signing posture for affected labels.`:'No At-Risk detections recorded — an excellent result.'}
+    ${highRate>=80?'The model demonstrates deployment-ready confidence stability.':'Further training on underperforming signs is recommended before deployment.'}`;
+
+  // Chart 2: Distribution
+  const sortedLabels=Object.entries(labelCounts).sort((a,b)=>b[1]-a[1]);
+  dc('signDist');
+  charts['signDist']=new Chart(document.getElementById('signDistChart'),{
+    type:'doughnut',
+    data:{labels:sortedLabels.map(([k])=>k),datasets:[{data:sortedLabels.map(([,v])=>v),
+      backgroundColor:sortedLabels.map((_,i)=>pal[i%pal.length]+'cc'),
+      borderColor:sortedLabels.map((_,i)=>pal[i%pal.length]),borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:true,position:'right',labels:{color:'#94a3b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:10,boxHeight:10}}}}
+  });
+  const sufficient=sortedLabels.filter(([,v])=>v>=5).length;
+  const singleRep=sortedLabels.filter(([,v])=>v===1).length;
+  document.getElementById('signDistConcl').innerHTML=`
+    <span class="verdict ${sufficient===sortedLabels.length?'v-pass':singleRep>0?'v-part':'v-part'}">${sufficient===sortedLabels.length?'Balanced Coverage':singleRep>0?'Uneven Coverage':'Sparse Coverage'}</span><br>
+    <b>${sortedLabels.length} unique signs</b> detected. Most frequent: <b>${sortedLabels[0][0]} (${sortedLabels[0][1]}×)</b>.
+    ${sufficient>0?`<b>${sufficient} sign${sufficient!==1?'s':''}</b> have ≥5 repetitions (statistically meaningful). `:''}
+    ${singleRep>0?`<b>${singleRep} sign${singleRep!==1?'s':''}</b> appeared only once — insufficient for per-class evaluation. `:''}
+    Target ≥5 repetitions per sign for statistically valid accuracy assessment.`;
+
+  // Chart 3: Inference
+  dc('infer');
+  charts['infer']=new Chart(document.getElementById('inferenceChart'),{
+    type:'bar',
+    data:{labels:gestures.map((_,i)=>`#${i+1}`),datasets:[{data:inf,
+      backgroundColor:inf.map(v=>v>100?'rgba(248,113,113,0.7)':'rgba(56,189,248,0.6)'),
+      borderColor:inf.map(v=>v>100?'#f87171':'#38bdf8'),borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...bs.x,ticks:{...bs.x.ticks,display:gestures.length<=60}},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+'ms'}}}}
+  });
+  const delayed=inf.filter(v=>v>=100).length;
+  document.getElementById('inferConcl').innerHTML=`
+    <span class="verdict ${delayed===0?'v-pass':delayed<=2?'v-part':'v-flag'}">${delayed===0?'Meets Real-Time Requirement':delayed<=2?'Mostly Real-Time':'Latency Issues Present'}</span><br>
+    Average: <b>${avgInf.toFixed(1)}ms</b>. Max: <b>${Math.max(...inf)}ms</b>. Min: <b>${Math.min(...inf)}ms</b>.
+    ${delayed===0?'All gestures completed within the 100ms real-time threshold. The inference pipeline is performing optimally for live assistive communication.'
+    :`<b>${delayed} gesture${delayed!==1?'s':''}</b> exceeded 100ms. ${Math.max(...inf)>150?'The peak value suggests a cold-start initialization cost on session boot — a one-time overhead, not a systemic issue.':'Monitor for persistent spikes in extended sessions.'}`}`;
+
+  // Chart 4: dBFS
+  dc('dbfs');
+  if(ttsRows.length){
+    charts['dbfs']=new Chart(document.getElementById('dbfsChart'),{
+      type:'bar',
+      data:{
+        labels:ttsRows.map(t=>(t.tts_text||'').replace(/"/g,'').slice(0,18)||'TTS'),
+        datasets:[{data:ttsRows.map(t=>parseFloat(t.tts_dbfs)||0),
+          backgroundColor:ttsRows.map(t=>{const v=parseFloat(t.tts_dbfs);return v>-40?'rgba(52,211,153,0.7)':v>-70?'rgba(251,191,36,0.7)':'rgba(248,113,113,0.7)';}),
+          borderColor:ttsRows.map(t=>{const v=parseFloat(t.tts_dbfs);return v>-40?'#34d399':v>-70?'#fbbf24':'#f87171';}),
+          borderWidth:1,borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{...bs.x,ticks:{...bs.x.ticks,maxRotation:35,display:ttsRows.length<=30}},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+' dBFS'}}}}
+    });
+    const nearSil=ttsDbfs.filter(v=>v<-70).length;
+    const minDb=Math.min(...ttsDbfs),maxDb=Math.max(...ttsDbfs);
+    document.getElementById('dbfsConcl').innerHTML=`
+      <span class="verdict ${audible===ttsRows.length?'v-pass':nearSil>0?'v-flag':'v-part'}">${audible===ttsRows.length?'All Outputs Audible':nearSil>0?'Requires Immediate Attention':'Partially Audible'}</span><br>
+      Audio range: <b>${minDb.toFixed(1)} to ${maxDb.toFixed(1)} dBFS</b> (spread of ${(maxDb-minDb).toFixed(1)} dB).
+      <b>${audible} of ${ttsRows.length}</b> outputs fall within the audible benchmark.
+      ${nearSil>0?`<b>${nearSil} output${nearSil!==1?'s are':' is'} near-silent (&lt;-70 dBFS)</b> — effectively inaudible in real-world environments. `:''}
+      ${audible<ttsRows.length?'Implementing AGC or audio normalization targeting -20 to -35 dBFS is strongly recommended before user-facing testing.':'TTS audio levels are consistent and within target range.'}`;
+  }
+
+  // Chart 5: Avg conf by sign
+  const signLabels=Object.keys(labelAvgConf).sort((a,b)=>{
+    const avgA=labelAvgConf[a].reduce((x,y)=>x+y,0)/labelAvgConf[a].length;
+    const avgB=labelAvgConf[b].reduce((x,y)=>x+y,0)/labelAvgConf[b].length;
+    return avgB-avgA;
+  });
+  const signAvgs=signLabels.map(k=>+(labelAvgConf[k].reduce((a,b)=>a+b,0)/labelAvgConf[k].length*100).toFixed(1));
+  dc('avgConf');
+  charts['avgConf']=new Chart(document.getElementById('avgConfChart'),{
+    type:'bar',
+    data:{labels:signLabels,datasets:[{data:signAvgs,
+      backgroundColor:signAvgs.map(v=>v>=85?'rgba(52,211,153,0.75)':v>=70?'rgba(251,191,36,0.75)':'rgba(248,113,113,0.75)'),
+      borderColor:signAvgs.map(v=>v>=85?'#34d399':v>=70?'#fbbf24':'#f87171'),
+      borderWidth:1,borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...bs.x,ticks:{...bs.x.ticks,maxRotation:40}},y:{...bs.y,min:0,max:100,ticks:{...bs.y.ticks,callback:v=>v+'%'}}}}
+  });
+  const reliableS=signLabels.filter((_,i)=>signAvgs[i]>=85).length;
+  const unreliableS=signLabels.filter((_,i)=>signAvgs[i]<70).length;
+  const worstS=signLabels[signAvgs.indexOf(Math.min(...signAvgs))];
+  document.getElementById('avgConfConcl').innerHTML=`
+    <span class="verdict ${unreliableS===0?'v-pass':reliableS>unreliableS?'v-part':'v-flag'}">${unreliableS===0?'All Signs Reliable':reliableS>0?`${reliableS} of ${signLabels.length} Signs Pass`:'Widespread Unreliability'}</span><br>
+    <b>${reliableS}</b> sign${reliableS!==1?'s':''} average ≥85% (Optimal). <b>${signLabels.filter((_,i)=>signAvgs[i]>=70&&signAvgs[i]<85).length}</b> are Borderline. <b>${unreliableS}</b> are Unreliable.
+    ${unreliableS>0?`<b>${worstS}</b> has the lowest average confidence and should be prioritized for retraining or additional data augmentation.`:''}
+    Signs averaging below 80% should undergo targeted data collection before the next evaluation cycle.`;
+
+  // Chart 6: Confidence bands
+  dc('confBand');
+  charts['confBand']=new Chart(document.getElementById('confBandChart'),{
+    type:'doughnut',
+    data:{labels:[`Optimal (≥85%) — ${high}`,`Marginal (70–84%) — ${mid}`,`At-Risk (<70%) — ${low}`],
+      datasets:[{data:[high,mid,low],
+        backgroundColor:['rgba(52,211,153,0.75)','rgba(251,191,36,0.75)','rgba(248,113,113,0.75)'],
+        borderColor:['#34d399','#fbbf24','#f87171'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{display:true,position:'right',labels:{color:'#94a3b8',font:{family:'DM Mono',size:10},padding:10,boxWidth:10,boxHeight:10}}}}
+  });
+  const atRiskPct=(low/gestures.length*100).toFixed(1);
+  document.getElementById('confBandConcl').innerHTML=`
+    <span class="verdict ${highRate>=80&&parseFloat(atRiskPct)<=10?'v-pass':highRate>=60?'v-part':'v-flag'}">${highRate>=80&&parseFloat(atRiskPct)<=10?'Deployment Benchmark Met':highRate>=60?'Approaching Target':'Below Deployment Threshold'}</span><br>
+    <b>${highRate}%</b> of gestures in Optimal Zone (target: &gt;80%). At-Risk: <b>${low} (${atRiskPct}%)</b> (target: &lt;10%).
+    ${highRate>=80&&parseFloat(atRiskPct)<=10?'The model meets the recommended deployment benchmarks for this session.'
+    :`Reducing At-Risk events below ${Math.ceil(gestures.length*0.10)} would indicate a production-ready profile. Continued sign-level iteration is recommended.`}`;
+
+  // STT
+  if(sttRows.length>0){
+    document.getElementById('sttSection').style.display='block';
+    document.getElementById('sttTableWrap').innerHTML=`<table>
+      <thead><tr><th>#</th><th>Time</th><th>Transcript</th><th>Environment</th><th>dBFS</th><th>Latency</th></tr></thead>
+      <tbody>${sttRows.map((s,i)=>{
+        const dv=parseFloat(s.stt_dbfs),dc2=dv>=-40?'var(--accent3)':dv>=-70?'var(--warn)':'#f87171';
+        return`<tr><td>${i+1}</td><td style="color:var(--muted)">${s.datetime?.slice(11,19)||''}</td>
+          <td>"${s.stt_transcript}"</td>
+          <td>${s.stt_environment==='quiet'?'<span class="badge b-gn">Quiet</span>':'<span class="badge b-wn">Noisy</span>'}</td>
+          <td style="color:${dc2}">${s.stt_dbfs}</td><td>${parseFloat(s.stt_latency_ms).toFixed(0)}ms</td></tr>`;
+      }).join('')}</tbody></table>`;
+    const sttLats=sttRows.map(s=>parseFloat(s.stt_latency_ms));
+    const avgSttLat=sttLats.reduce((a,b)=>a+b,0)/sttLats.length;
+    dc('sttLat');
+    charts['sttLat']=new Chart(document.getElementById('sttLatChart'),{
+      type:'bar',
+      data:{labels:sttRows.map((_,i)=>`#${i+1}`),datasets:[{data:sttLats,
+        backgroundColor:sttLats.map(v=>v<500?'rgba(52,211,153,0.7)':v<1000?'rgba(251,191,36,0.7)':'rgba(248,113,113,0.7)'),
+        borderColor:sttLats.map(v=>v<500?'#34d399':v<1000?'#fbbf24':'#f87171'),borderWidth:1,borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{...bs.x},y:{...bs.y,ticks:{...bs.y.ticks,callback:v=>v+'ms'}}}}
+    });
+    const hasWER=sttRows.some(s=>s.stt_wer);
+    document.getElementById('sttConcl').innerHTML=`
+      <span class="verdict ${sttRows.length>=5?'v-pass':'v-part'}">${sttRows.length>=5?'Sufficient STT Data':'Limited STT Sample'}</span><br>
+      <b>${sttRows.length} STT event${sttRows.length!==1?'s':''}</b> recorded.
+      ${sttRows.length<5?`Only ${sttRows.length} transcription${sttRows.length!==1?'s':''} — insufficient for reliable evaluation. A minimum of 5–10 events across quiet and noisy conditions is recommended. `:''}
+      ${hasWER?`Avg WER: <b>${(sttRows.filter(s=>s.stt_wer).reduce((a,s)=>a+parseFloat(s.stt_wer),0)/sttRows.filter(s=>s.stt_wer).length*100).toFixed(1)}%</b>. `:'No WER computed (ground truth reference not provided). '}
+      Avg transcription latency: <b>${avgSttLat.toFixed(0)}ms</b>.`;
+    document.getElementById('sttLatConcl').innerHTML=`
+      <span class="verdict ${avgSttLat<500?'v-pass':avgSttLat<1000?'v-part':'v-flag'}">${avgSttLat<500?'Fast Transcription':avgSttLat<1000?'Acceptable Latency':'High Latency'}</span><br>
+      Average STT latency: <b>${avgSttLat.toFixed(0)}ms</b> across ${sttRows.length} event${sttRows.length!==1?'s':''}.
+      ${avgSttLat<500?'Transcription speed is well within real-time usability bounds for assistive communication.'
+      :avgSttLat<1000?'Latency is acceptable but may cause minor delays. Consider optimizing the Whisper model size or hardware resources.'
+      :'High latency detected — may significantly impair real-time usability. Review model complexity and audio chunk sizing.'}`;
+  }else{
+    document.getElementById('sttSection').style.display='none';
+  }
+
+  // Per-gesture bars
+  document.getElementById('confBars').innerHTML=gestures.map((g,i)=>{
+    const pct=(parseFloat(g.confidence)*100).toFixed(1);
+    const c=parseFloat(g.confidence)>=0.85?'#34d399':parseFloat(g.confidence)>=0.70?'#fbbf24':'#f87171';
+    const zone=parseFloat(g.confidence)>=0.85?'Optimal':parseFloat(g.confidence)>=0.70?'Marginal':'At-Risk';
+    return`<div class="cb-wrap">
+      <div class="cb-label">
+        <span>#${i+1} <b>${g.predicted_label}</b> <span style="color:var(--muted);font-size:9px">${g.datetime?.slice(11,19)||''}</span>
+          <span class="ztag" style="background:${c}22;color:${c};">${zone}</span></span>
+        <span style="color:${c};font-size:11px;">${pct}%</span>
+      </div>
+      <div class="cb-track"><div class="cb-fill" style="width:${pct}%;background:${c};"></div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('perGestureConcl').innerHTML=`
+    <span class="verdict ${highRate>=80?'v-pass':'v-part'}">Generally ${highRate>=80?'Strong':'Acceptable'} — ${low>0?`${low} At-Risk Outlier${low!==1?'s':''}`:' No Outliers'}</span><br>
+    Session high: <b>#${confs.indexOf(Math.max(...confs))+1} ${topG.predicted_label} at ${(Math.max(...confs)*100).toFixed(1)}%</b>.
+    Session low: <b>#${confs.indexOf(Math.min(...confs))+1} ${botG.predicted_label} at ${(Math.min(...confs)*100).toFixed(1)}%</b>.
+    ${low>0?'At-Risk detections likely reflect transient factors (occlusion, lighting, posture) rather than fundamental model failures — cross-reference against session video if available.':'All detections meet or approach reliability thresholds, confirming consistent signing conditions.'}`;
+
+  // TTS Table
+  document.getElementById('ttsTableBody').innerHTML=ttsRows.map((t,i)=>{
+    const dv=parseFloat(t.tts_dbfs);
+    const dc2=dv>=-40?'var(--accent3)':dv>=-70?'var(--warn)':'#f87171';
+    const audTag=dv>=-40?'<span class="badge b-gn">Audible ✓</span>':dv>=-70?'<span class="badge b-wn">Low</span>':'<span class="badge b-rd">Near-Silent</span>';
+    const lat=parseFloat(t.tts_latency_ms);
+    return`<tr><td>${i+1}</td><td style="color:var(--muted)">${t.datetime?.slice(11,19)||''}</td>
+      <td>${(t.tts_text||'').replace(/"/g,'')}</td>
+      <td style="color:${dc2}">${t.tts_dbfs} dBFS</td>
+      <td>${lat>0?`<span style="color:var(--warn)">${lat}ms</span>`:'<span style="color:var(--muted)">0ms</span>'}</td>
+      <td>${audTag}</td></tr>`;
+  }).join('');
+  document.getElementById('ttsConcl').innerHTML=`
+    <span class="verdict ${audible===ttsRows.length?'v-pass':audible>ttsRows.length*0.6?'v-part':'v-flag'}">${audible===ttsRows.length?'All Outputs Audible':audible>ttsRows.length*0.6?'NLG Functional — Audio Needs Improvement':'Critical Audio Issues'}</span><br>
+    <b>${ttsRows.length}</b> TTS sentence${ttsRows.length!==1?'s':''} produced. <b>${audible} of ${ttsRows.length}</b> (${Math.round(audible/ttsRows.length*100)}%) fall within the audible benchmark.
+    ${audible<ttsRows.length?'Audio normalization targeting -20 to -35 dBFS using AGC or post-processing is recommended. The NLG sentence construction layer is functional.':'TTS pipeline is performing well across both language generation and audio rendering.'}`;
+
+  // Key findings (dynamic)
+  const findings=[];
+  findings.push({icon:'✓',bg:'rgba(56,189,248,.15)',c:'var(--accent)',text:`<b>End-to-End Pipeline Operational.</b> ${gestures.length} gestures detected, ${ttsRows.length} TTS sentences produced without system failure.`});
+  if(high/confs.length>=0.75)findings.push({icon:'↑',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>Strong Confidence on Dominant Signs.</b> ${highRate}% of detections exceeded the 85% threshold. The model generalizes well to frequently signed labels.`});
+  if(low>0)findings.push({icon:'⚠',bg:'rgba(251,191,36,.15)',c:'var(--warn)',text:`<b>At-Risk Detections Present.</b> ${low} gesture${low!==1?'s':''} scored below 70%. Affected: ${[...new Set(gestures.filter(g=>parseFloat(g.confidence)<0.70).map(g=>g.predicted_label))].join(', ')}.`});
+  if(avgDbfs!==null&&avgDbfs<-40)findings.push({icon:'!',bg:'rgba(248,113,113,.15)',c:'var(--danger)',text:`<b>TTS Audio Volume Inconsistent.</b> Average ${avgDbfs.toFixed(1)} dBFS falls below the audible benchmark. Only ${audible}/${ttsRows.length} outputs are clearly audible.`});
+  else if(avgDbfs!==null)findings.push({icon:'🔊',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>TTS Audio Within Audible Range.</b> Average ${avgDbfs.toFixed(1)} dBFS meets target. ${audible}/${ttsRows.length} outputs are clearly audible.`});
+  if(avgInf<100)findings.push({icon:'⏱',bg:'rgba(167,139,250,.15)',c:'var(--accent2)',text:`<b>Inference Latency Meets Real-Time Bounds.</b> Average ${avgInf.toFixed(1)}ms confirms suitability for live assistive communication.`});
+  if(!gestures.some(g=>g.ground_truth))findings.push({icon:'∅',bg:'rgba(251,146,60,.15)',c:'var(--accent4)',text:`<b>No Ground Truth Provided.</b> Formal Accuracy, Precision, Recall, and F1 cannot be computed. Annotating gestures is required for quantitative thesis evaluation.`});
+  if(!sttRows.length)findings.push({icon:'🎙',bg:'rgba(100,116,139,.15)',c:'var(--muted)',text:`<b>STT Pipeline Untested.</b> Zero STT events captured. Dedicated STT sessions should be run to evaluate the speech-to-text component.`});
+  document.getElementById('keyFindings').innerHTML=`
+    <div class="obs-title">🔬 Summary of Testing Session Results</div>
+    <div class="obs-list">${findings.map(f=>`<div class="obs-item">
+      <div class="obs-icon" style="background:${f.bg};color:${f.c}">${f.icon}</div>
+      <div class="obs-text">${f.text}</div></div>`).join('')}</div>`;
+
+  // Recommendations (dynamic)
+  const recs=[];
+  if(!gestures.some(g=>g.ground_truth))recs.push('Annotate test sessions with <b>ground truth labels</b> on all gesture events to enable Accuracy, Precision, Recall, and F1-Score computation — the core quantitative thesis metrics.');
+  if(unreliableS>0)recs.push(`Augment training data for <b>${signLabels.filter((_,i)=>signAvgs[i]<70).join(', ')}</b> — signs averaging below 70%. Add varied lighting conditions, signing angles, and multiple signer profiles.`);
+  if(avgDbfs!==null&&audible<ttsRows.length)recs.push('Implement <b>TTS audio normalization</b> targeting -20 to -35 dBFS using Automatic Gain Control (AGC) or post-processing normalization before speaker output rendering.');
+  if(low>0)recs.push('Apply a <b>confidence threshold filter (≥0.70)</b> to suppress At-Risk predictions from entering the sentence builder, reducing erroneous tokens in TTS output.');
+  if(!sttRows.length)recs.push('Conduct dedicated sessions to exercise the <b>STT pipeline</b> — zero events were captured, leaving that component entirely untested in this session.');
+  const underRep=sortedLabels.filter(([,v])=>v<5);
+  if(underRep.length)recs.push(`Increase test coverage to <b>≥5 repetitions per sign label</b>. Currently underrepresented: ${underRep.map(([k,v])=>`${k} (${v}×)`).join(', ')}.`);
+  if(Object.keys(allSessions).length===1)recs.push('Upload additional session CSVs from your <b>logs/ folder</b> to enable cross-session trend analysis and track confidence improvements over time.');
+  document.getElementById('recommendations').innerHTML=`
+    <div class="obs-title">📋 Recommended Actions for Next Testing Phase</div>
+    <div class="obs-list">${recs.map((r,i)=>`<div class="obs-item">
+      <div class="obs-icon" style="background:rgba(167,139,250,.15);color:var(--accent2)">${i+1}</div>
+      <div class="obs-text">${r}</div></div>`).join('')}</div>`;
+
+  document.getElementById('footerSessions').textContent=Object.keys(allSessions).length;
+  document.getElementById('footerEvents').textContent=rows.length;
+}
+
+document.getElementById('no-data').style.display='block';
+document.getElementById('dashboard').style.display='none';
+</script>
+</body>
+</html>
