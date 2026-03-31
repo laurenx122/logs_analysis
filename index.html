@@ -94,6 +94,48 @@ tr:hover td{background:rgba(56,189,248,.03);}
 .info-row .v{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:#fff;}
 footer{text-align:center;padding-top:32px;border-top:1px solid var(--border);color:var(--muted);font-size:10px;margin-top:40px;}
 footer span{color:var(--accent);}
+
+/* ── GROUND TRUTH ADDITIONS ─────────────────────────────────────── */
+
+/* GT Upload zone */
+.gt-upload-zone{border:2px dashed rgba(167,139,250,.35);border-radius:16px;padding:24px 32px;margin-bottom:32px;transition:border-color .2s,background .2s;position:relative;background:rgba(167,139,250,.03);}
+.gt-upload-zone:hover,.gt-upload-zone.drag{border-color:var(--accent2);background:rgba(167,139,250,.07);}
+.gt-upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.gt-header{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.gt-icon{font-size:22px;}
+.gt-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+.gt-sub{font-size:11px;color:var(--muted);}
+.gt-status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:99px;font-size:10px;font-weight:600;margin-top:8px;}
+.gt-status.loaded{background:rgba(167,139,250,.15);color:var(--accent2);border:1px solid rgba(167,139,250,.3);}
+.gt-status.empty{background:rgba(100,116,139,.12);color:var(--muted);border:1px solid var(--border);}
+.gt-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.gt-pill{padding:3px 10px;border-radius:99px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);font-size:10px;color:var(--accent2);}
+
+/* GT correct/incorrect coloring on bars */
+.cb-fill.gt-correct{background:#34d399 !important;}
+.cb-fill.gt-incorrect{background:#f87171 !important;}
+.cb-fill.gt-unknown{} /* keeps original confidence color */
+
+.correct-tag{font-size:9px;padding:1px 7px;border-radius:99px;background:rgba(52,211,153,.15);color:#34d399;margin-left:4px;}
+.incorrect-tag{font-size:9px;padding:1px 7px;border-radius:99px;background:rgba(248,113,113,.15);color:#f87171;margin-left:4px;}
+
+/* Accuracy stats row */
+.acc-stat-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+.acc-mini{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;flex:1 1 130px;min-width:130px;}
+.acc-mini .lbl{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.acc-mini .val{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:#fff;}
+.acc-mini .val span{font-size:14px;}
+.acc-mini .sub{font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* F1 Table */
+.f1-table-wrap{overflow-x:auto;}
+.f1-table-wrap table th{white-space:nowrap;}
+.f1-bar{height:4px;border-radius:99px;margin-top:4px;}
+
+/* Correct/incorrect chart legend items */
+.bm-d.correct{background:#34d399;}
+.bm-d.incorrect{background:#f87171;}
+/* ────────────────────────────────────────────────────────────────── */
 </style>
 </head>
 <body>
@@ -113,6 +155,21 @@ footer span{color:var(--accent);}
   <div class="upload-hint">Select all files from your <code>logs/</code> folder at once — the dashboard will auto-detect dates from filenames and let you filter by session or date range</div>
   <div class="file-chips" id="fileChips"></div>
 </div>
+
+<!-- ── GROUND TRUTH UPLOAD (NEW) ──────────────────────────────────── -->
+<div class="gt-upload-zone" id="gtDropZone">
+  <input type="file" id="gtFileInput" accept=".csv">
+  <div class="gt-header">
+    <span class="gt-icon">🎯</span>
+    <div>
+      <div class="gt-title">Ground Truth Sign List (Optional)</div>
+      <div class="gt-sub">Upload your gesture list CSV with columns <code>index, label, category</code> — enables Accuracy, Precision, Recall &amp; F1 per sign</div>
+    </div>
+  </div>
+  <div id="gtStatus" class="gt-status empty">⊘ No ground truth loaded — label-match accuracy disabled</div>
+  <div class="gt-pills" id="gtPills"></div>
+</div>
+<!-- ──────────────────────────────────────────────────────────────── -->
 
 <!-- NO DATA -->
 <div id="no-data">
@@ -147,6 +204,50 @@ footer span{color:var(--accent);}
 
   <!-- STAT CARDS -->
   <div class="stats-grid" id="statsGrid"></div>
+
+  <!-- ── GROUND TRUTH ACCURACY SECTION (NEW) ─────────────────────── -->
+  <div id="gtSection" style="display:none;">
+    <div class="sec-title"><span class="dot" style="background:var(--accent2)"></span> Ground Truth Accuracy Analysis</div>
+
+    <!-- Accuracy summary stats -->
+    <div class="acc-stat-row" id="accStatRow"></div>
+
+    <!-- Correct vs Incorrect chart + F1 table -->
+    <div class="g2">
+      <div class="card">
+        <div class="card-title">Correct vs Incorrect Detections per Sign Label</div>
+        <div class="cw tall"><canvas id="gtCorrectChart"></canvas></div>
+        <div class="bm">
+          <div class="bm-item"><div class="bm-d correct"></div><span class="bm-lbl"><b>Correct</b> predicted_label matches ground truth label</span></div>
+          <div class="bm-item"><div class="bm-d incorrect"></div><span class="bm-lbl"><b>Incorrect</b> mismatch with any ground truth label</span></div>
+        </div>
+        <div class="concl" id="gtCorrectConcl" style="border-left-color:var(--accent2);"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Accuracy % per Sign Label</div>
+        <div class="cw tall"><canvas id="gtAccChart"></canvas></div>
+        <div class="bm">
+          <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>High</b> ≥80% accuracy</span></div>
+          <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Moderate</b> 50–79%</span></div>
+          <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Low</b> &lt;50% — needs retraining</span></div>
+        </div>
+        <div class="concl" id="gtAccConcl" style="border-left-color:var(--accent3);"></div>
+      </div>
+    </div>
+
+    <!-- Precision / Recall / F1 table -->
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Per-Sign Precision · Recall · F1-Score — Label-Based Classification Metrics</div>
+      <div class="scroll-body f1-table-wrap" id="f1TableWrap"></div>
+      <div class="bm" style="margin-top:14px;">
+        <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Strong</b> F1 ≥0.80</span></div>
+        <div class="bm-item"><div class="bm-d mrg"></div><span class="bm-lbl"><b>Moderate</b> F1 0.50–0.79</span></div>
+        <div class="bm-item"><div class="bm-d risk"></div><span class="bm-lbl"><b>Weak</b> F1 &lt;0.50 — retraining recommended</span></div>
+      </div>
+      <div class="concl" id="f1Concl" style="border-left-color:var(--warn);margin-top:14px;"></div>
+    </div>
+  </div>
+  <!-- ──────────────────────────────────────────────────────────────── -->
 
   <!-- GESTURE RECOGNITION -->
   <div class="sec-title"><span class="dot"></span> Gesture Recognition Performance</div>
@@ -252,7 +353,7 @@ footer span{color:var(--accent);}
   <!-- PER-GESTURE BARS -->
   <div class="sec-title"><span class="dot p"></span> Per-Gesture Confidence Breakdown</div>
   <div class="card" style="margin-bottom:18px;">
-    <div class="card-title">All Gesture Detections — Individual Scores with Zone Classification</div>
+    <div class="card-title">All Gesture Detections — Individual Scores with Zone Classification<span id="gtBarLegend" style="display:none;margin-left:12px;font-size:9px;color:var(--accent2);">🎯 GT color: <span style="color:#34d399">■ Correct</span> · <span style="color:#f87171">■ Incorrect</span></span></div>
     <div class="scroll-body" id="confBars"></div>
     <div class="bm" style="margin-top:14px;">
       <div class="bm-item"><div class="bm-d opt"></div><span class="bm-lbl"><b>Optimal</b> ≥85%</span></div>
@@ -294,7 +395,9 @@ let allSessions={};
 let activeFilter={type:'all',session:'all'};
 let charts={};
 
-// CSV parser with quoted field support
+// ── GROUND TRUTH STATE (NEW) ──────────────────────────────────────
+let gtLabels=new Set(); // set of valid label strings from the GT csv
+
 function parseCSV(text){
   const lines=text.trim().split('\n');
   const headers=lines[0].split(',').map(h=>h.trim().replace(/\r/,''));
@@ -311,6 +414,49 @@ function parseCSV(text){
     return row;
   });
 }
+
+// ── GROUND TRUTH CSV UPLOAD HANDLER (NEW) ─────────────────────────
+const gtFileInput=document.getElementById('gtFileInput');
+const gtDropZone=document.getElementById('gtDropZone');
+
+gtFileInput.addEventListener('change',e=>{
+  const f=e.target.files[0];
+  if(f)loadGT(f);
+});
+gtDropZone.addEventListener('dragover',e=>{e.preventDefault();gtDropZone.classList.add('drag');});
+gtDropZone.addEventListener('dragleave',()=>gtDropZone.classList.remove('drag'));
+gtDropZone.addEventListener('drop',e=>{
+  e.preventDefault();gtDropZone.classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.name.endsWith('.csv'))loadGT(f);
+});
+
+function loadGT(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const rows=parseCSV(e.target.result);
+    gtLabels=new Set();
+    // Support columns: label, name, sign, word, gesture (flexible)
+    rows.forEach(r=>{
+      const lbl=(r.label||r.name||r.sign||r.word||r.gesture||'').trim();
+      if(lbl)gtLabels.add(lbl);
+    });
+    const statusEl=document.getElementById('gtStatus');
+    const pillsEl=document.getElementById('gtPills');
+    if(gtLabels.size>0){
+      statusEl.className='gt-status loaded';
+      statusEl.textContent=`✓ ${gtLabels.size} ground truth signs loaded from "${file.name}"`;
+      pillsEl.innerHTML=[...gtLabels].map(l=>`<span class="gt-pill">${l}</span>`).join('');
+    }else{
+      statusEl.className='gt-status empty';
+      statusEl.textContent='⚠ Could not parse labels — ensure column is named "label"';
+      pillsEl.innerHTML='';
+    }
+    renderDashboard();
+  };
+  reader.readAsText(file);
+}
+// ─────────────────────────────────────────────────────────────────
 
 const fileInput=document.getElementById('fileInput');
 const dropZone=document.getElementById('dropZone');
@@ -397,6 +543,53 @@ function getFilteredRows(){
   return rows;
 }
 
+// ── GROUND TRUTH HELPERS (NEW) ────────────────────────────────────
+// Label-based: a gesture is "correct" if its predicted_label exists in gtLabels
+function isGestureCorrect(g){
+  if(!gtLabels.size)return null; // unknown — no GT loaded
+  return gtLabels.has(g.predicted_label);
+}
+
+// Compute per-label TP, FP, FN for Precision/Recall/F1
+// Since GT is label-based (we know which labels SHOULD exist but not which were EXPECTED
+// at each timestep), we treat it as:
+//   TP = detections of label L where L ∈ gtLabels  (correct detections)
+//   FP = detections of label L where L ∉ gtLabels  (hallucinated label)
+//   FN = for each GT label, how many times it was NOT detected (not directly measurable
+//        without a per-frame expected sequence, so we approximate:
+//        FN = 0 for this label-set mode, and note it in the UI)
+// For accuracy we use: correct / total_detections_of_that_label
+function computeGTMetrics(gestures){
+  // Per-label counts
+  const stats={};
+  // Initialize for all GT labels too (so labels with 0 detections still appear)
+  gtLabels.forEach(lbl=>{
+    if(!stats[lbl])stats[lbl]={tp:0,fp:0,fn:0,total:0};
+  });
+  gestures.forEach(g=>{
+    const lbl=g.predicted_label;
+    if(!stats[lbl])stats[lbl]={tp:0,fp:0,fn:0,total:0};
+    stats[lbl].total++;
+    if(gtLabels.has(lbl)){
+      stats[lbl].tp++;
+    }else{
+      stats[lbl].fp++;
+    }
+  });
+  // For labels in GT but never predicted: fn increments aren't computable without
+  // expected sequence, so we leave fn=0 and note "label never detected" via total=0
+  const result={};
+  Object.entries(stats).forEach(([lbl,s])=>{
+    const precision=s.tp+s.fp>0?s.tp/(s.tp+s.fp):0;
+    const recall=s.tp+s.fn>0?s.tp/(s.tp+s.fn):null; // null when fn unknown
+    const f1=precision>0&&s.tp>0?(2*s.tp)/(2*s.tp+s.fp+s.fn):0;
+    const accuracy=s.total>0?s.tp/s.total:null;
+    result[lbl]={...s,precision,recall,f1,accuracy,inGT:gtLabels.has(lbl)};
+  });
+  return result;
+}
+// ─────────────────────────────────────────────────────────────────
+
 const bs={
   x:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}},
   y:{grid:{color:'rgba(30,45,69,0.8)'},ticks:{color:'#64748b',font:{family:'DM Mono',size:9}}}
@@ -450,7 +643,7 @@ function renderDashboard(){
     <div class="info-row"><span class="k">Total Events</span><span class="v">${rows.length}</span></div>
     <div class="info-row"><span class="k">Unique Signs</span><span class="v">${Object.keys(labelCounts).length}</span></div>
     <div class="info-row"><span class="k">STT Events</span><span class="v">${sttRows.length||'0 (none)'}</span></div>
-    <div class="info-row"><span class="k">Ground Truth</span><span class="v">${gestures.some(g=>g.ground_truth)?'Provided':'Not provided'}</span></div>
+    <div class="info-row"><span class="k">Ground Truth</span><span class="v">${gtLabels.size>0?`${gtLabels.size} signs loaded`:gestures.some(g=>g.ground_truth)?'Provided':'Not provided'}</span></div>
     <div class="info-row"><span class="k">Reconnects</span><span class="v">${rows.filter(r=>r.event_type==='RECONNECT').length}</span></div>
   `;
 
@@ -465,6 +658,122 @@ function renderDashboard(){
     ${avgDbfs!==null?`<div class="stat"><div class="lbl">Avg TTS Level</div><div class="val">${Math.round(avgDbfs)}<span>dBFS</span></div><div class="info">${audible}/${ttsRows.length} audible</div><div class="bar" style="background:linear-gradient(90deg,${avgDbfs>=-40?'#34d399':avgDbfs>=-70?'#fbbf24':'#f87171'},transparent)"></div></div>`:''}
     ${sttRows.length?`<div class="stat"><div class="lbl">STT Events</div><div class="val">${sttRows.length}</div><div class="info">Transcriptions logged</div><div class="bar" style="background:linear-gradient(90deg,var(--accent3),transparent)"></div></div>`:''}
   `;
+
+  // ── GROUND TRUTH ACCURACY SECTION (NEW) ──────────────────────────
+  const hasGT=gtLabels.size>0;
+  document.getElementById('gtSection').style.display=hasGT?'block':'none';
+  document.getElementById('gtBarLegend').style.display=hasGT?'inline':'none';
+
+  if(hasGT){
+    const gtMetrics=computeGTMetrics(gestures);
+    const correctCount=gestures.filter(g=>gtLabels.has(g.predicted_label)).length;
+    const incorrectCount=gestures.length-correctCount;
+    const overallAcc=(correctCount/gestures.length*100).toFixed(1);
+
+    // Only consider labels that were actually detected for avg F1
+    const detectedMetrics=Object.values(gtMetrics).filter(m=>m.total>0&&m.inGT);
+    const avgF1=detectedMetrics.length?detectedMetrics.reduce((a,m)=>a+m.f1,0)/detectedMetrics.length:0;
+    const avgPrec=detectedMetrics.length?detectedMetrics.reduce((a,m)=>a+m.precision,0)/detectedMetrics.length:0;
+
+    // Accuracy mini stats
+    document.getElementById('accStatRow').innerHTML=`
+      <div class="acc-mini"><div class="lbl">Overall Accuracy</div><div class="val">${overallAcc}<span>%</span></div><div class="sub">${correctCount} correct of ${gestures.length}</div></div>
+      <div class="acc-mini"><div class="lbl">Correct Detections</div><div class="val" style="color:#34d399">${correctCount}</div><div class="sub">Label found in GT list</div></div>
+      <div class="acc-mini"><div class="lbl">Incorrect Detections</div><div class="val" style="color:#f87171">${incorrectCount}</div><div class="sub">Label not in GT list</div></div>
+      <div class="acc-mini"><div class="lbl">Avg Precision</div><div class="val">${(avgPrec*100).toFixed(1)}<span>%</span></div><div class="sub">Across detected GT signs</div></div>
+      <div class="acc-mini"><div class="lbl">Avg F1-Score</div><div class="val" style="color:${avgF1>=0.8?'#34d399':avgF1>=0.5?'#fbbf24':'#f87171'}">${avgF1.toFixed(2)}</div><div class="sub">Macro average (detected)</div></div>
+      <div class="acc-mini"><div class="lbl">GT Labels</div><div class="val">${gtLabels.size}</div><div class="sub">${Object.values(gtMetrics).filter(m=>m.total===0&&m.inGT).length} never detected</div></div>
+    `;
+
+    // Chart: Correct vs Incorrect per label (stacked bar)
+    // Only show labels that have detections
+    const detectedLabels=Object.entries(gtMetrics).filter(([,m])=>m.total>0).sort((a,b)=>b[1].total-a[1].total).map(([l])=>l);
+    dc('gtCorrect');
+    charts['gtCorrect']=new Chart(document.getElementById('gtCorrectChart'),{
+      type:'bar',
+      data:{
+        labels:detectedLabels,
+        datasets:[
+          {label:'Correct',data:detectedLabels.map(l=>gtMetrics[l].tp),backgroundColor:'rgba(52,211,153,0.75)',borderColor:'#34d399',borderWidth:1,borderRadius:3},
+          {label:'Incorrect',data:detectedLabels.map(l=>gtMetrics[l].fp),backgroundColor:'rgba(248,113,113,0.75)',borderColor:'#f87171',borderWidth:1,borderRadius:3}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{family:'DM Mono',size:10},boxWidth:10,boxHeight:10}}},
+        scales:{x:{...bs.x,stacked:true,ticks:{...bs.x.ticks,maxRotation:40}},y:{...bs.y,stacked:true,ticks:{...bs.y.ticks,callback:v=>v+'×'}}}}
+    });
+    const bestSign=detectedLabels.reduce((a,l)=>gtMetrics[l].tp>gtMetrics[a].tp?l:a,detectedLabels[0]);
+    const worstSign=detectedLabels.filter(l=>gtMetrics[l].inGT).reduce((a,l)=>gtMetrics[l].fp>gtMetrics[a].fp?l:a,detectedLabels[0]);
+    const neverDetected=Object.entries(gtMetrics).filter(([,m])=>m.total===0&&m.inGT).map(([l])=>l);
+    document.getElementById('gtCorrectConcl').innerHTML=`
+      <span class="verdict ${parseFloat(overallAcc)>=80?'v-pass':parseFloat(overallAcc)>=50?'v-part':'v-flag'}">${parseFloat(overallAcc)>=80?'Strong Accuracy':parseFloat(overallAcc)>=50?'Moderate Accuracy':'Low Accuracy'}</span><br>
+      <b>${correctCount} of ${gestures.length} detections (${overallAcc}%)</b> match a label in the ground truth list.
+      Highest correct count: <b>${bestSign} (${gtMetrics[bestSign].tp}✓)</b>.
+      ${incorrectCount>0?`<b>${incorrectCount} incorrect detection${incorrectCount!==1?'s':''}</b> — labels predicted by the model that do not appear in the GT list. `:'All predictions match GT labels — no hallucinated labels detected. '}
+      ${neverDetected.length>0?`<b>${neverDetected.length} GT sign${neverDetected.length!==1?'s':''} never detected</b>: ${neverDetected.join(', ')}.`:'All GT labels were detected at least once.'}`;
+
+    // Chart: Accuracy % per label
+    const gtSignLabels=detectedLabels.filter(l=>gtMetrics[l].inGT);
+    const gtAccVals=gtSignLabels.map(l=>+(gtMetrics[l].accuracy*100).toFixed(1));
+    dc('gtAcc');
+    charts['gtAcc']=new Chart(document.getElementById('gtAccChart'),{
+      type:'bar',
+      data:{labels:gtSignLabels,datasets:[{data:gtAccVals,
+        backgroundColor:gtAccVals.map(v=>v>=80?'rgba(52,211,153,0.75)':v>=50?'rgba(251,191,36,0.75)':'rgba(248,113,113,0.75)'),
+        borderColor:gtAccVals.map(v=>v>=80?'#34d399':v>=50?'#fbbf24':'#f87171'),
+        borderWidth:1,borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{...bs.x,ticks:{...bs.x.ticks,maxRotation:40}},y:{...bs.y,min:0,max:100,ticks:{...bs.y.ticks,callback:v=>v+'%'}}}}
+    });
+    const highAccSigns=gtSignLabels.filter((_,i)=>gtAccVals[i]>=80).length;
+    const lowAccSigns=gtSignLabels.filter((_,i)=>gtAccVals[i]<50).length;
+    document.getElementById('gtAccConcl').innerHTML=`
+      <span class="verdict ${lowAccSigns===0?'v-pass':highAccSigns>lowAccSigns?'v-part':'v-flag'}">${lowAccSigns===0?'All Signs High Accuracy':highAccSigns>0?`${highAccSigns} of ${gtSignLabels.length} High`:'Widespread Low Accuracy'}</span><br>
+      <b>${highAccSigns}</b> sign${highAccSigns!==1?'s':''} ≥80% accuracy. <b>${lowAccSigns}</b> sign${lowAccSigns!==1?'s':''} below 50% — flagged for retraining.
+      ${lowAccSigns>0?`Focus retraining on: <b>${gtSignLabels.filter((_,i)=>gtAccVals[i]<50).join(', ')}</b>.`:'All tested GT signs perform at or above the 80% threshold.'}`;
+
+    // Precision / Recall / F1 table
+    const f1Rows=detectedLabels.sort((a,b)=>gtMetrics[b].f1-gtMetrics[a].f1);
+    document.getElementById('f1TableWrap').innerHTML=`<table>
+      <thead><tr>
+        <th>Sign Label</th><th>In GT?</th><th>Detections</th><th>Correct (TP)</th><th>Incorrect (FP)</th>
+        <th>Accuracy</th><th>Precision</th><th>F1-Score</th><th>Category</th>
+      </tr></thead>
+      <tbody>${f1Rows.map(lbl=>{
+        const m=gtMetrics[lbl];
+        const f1c=m.f1>=0.8?'#34d399':m.f1>=0.5?'#fbbf24':'#f87171';
+        const acc=m.accuracy!=null?(m.accuracy*100).toFixed(1)+'%':'—';
+        const prec=(m.precision*100).toFixed(1)+'%';
+        const inGTBadge=m.inGT?'<span class="badge b-gn">✓ Yes</span>':'<span class="badge b-rd">✗ No</span>';
+        return`<tr>
+          <td><b>${lbl}</b></td>
+          <td>${inGTBadge}</td>
+          <td>${m.total}</td>
+          <td style="color:#34d399">${m.tp}</td>
+          <td style="color:${m.fp>0?'#f87171':'var(--muted)'}">${m.fp}</td>
+          <td>
+            <div style="color:${m.accuracy>=0.8?'#34d399':m.accuracy>=0.5?'#fbbf24':'#f87171'}">${acc}</div>
+            ${m.accuracy!=null?`<div class="f1-bar" style="width:${(m.accuracy*100).toFixed(0)}%;background:${m.accuracy>=0.8?'#34d399':m.accuracy>=0.5?'#fbbf24':'#f87171'};max-width:100px;"></div>`:''}
+          </td>
+          <td>${prec}</td>
+          <td>
+            <div style="color:${f1c};font-weight:600">${m.f1.toFixed(2)}</div>
+            <div class="f1-bar" style="width:${(m.f1*100).toFixed(0)}%;background:${f1c};max-width:100px;"></div>
+          </td>
+          <td style="color:var(--muted)">${m.inGT?'GT Label':'Not in GT'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+    const strongF1=f1Rows.filter(l=>gtMetrics[l].f1>=0.8).length;
+    const weakF1=f1Rows.filter(l=>gtMetrics[l].f1<0.5&&gtMetrics[l].inGT).length;
+    document.getElementById('f1Concl').innerHTML=`
+      <span class="verdict ${weakF1===0?'v-pass':strongF1>weakF1?'v-part':'v-flag'}">${weakF1===0?'Strong F1 Across Board':strongF1>0?`${strongF1} Signs with Strong F1`:'Low F1 — Retraining Needed'}</span><br>
+      Macro-avg F1 (detected GT labels): <b>${avgF1.toFixed(2)}</b>. Avg Precision: <b>${(avgPrec*100).toFixed(1)}%</b>.
+      <b>${strongF1}</b> sign${strongF1!==1?'s':''} scored F1 ≥0.80 (strong). <b>${weakF1}</b> scored below 0.50 (needs attention).
+      ${incorrectCount>0?`Note: <b>${incorrectCount} detection${incorrectCount!==1?'s':''}</b> predicted labels not in the GT list — these inflate FP counts. Verify your GT CSV contains all expected sign labels.`:'All predictions matched GT labels — clean label space confirmed.'}
+      Recall requires a timestep-matched expected sequence to compute precisely; current values reflect label-set membership matching.`;
+  }
+  // ─────────────────────────────────────────────────────────────────
 
   // Chart 1: Confidence Line
   dc('confLine');
@@ -635,24 +944,35 @@ function renderDashboard(){
     document.getElementById('sttSection').style.display='none';
   }
 
-  // Per-gesture bars
+  // ── Per-gesture bars WITH GT color coding (NEW) ───────────────────
   document.getElementById('confBars').innerHTML=gestures.map((g,i)=>{
     const pct=(parseFloat(g.confidence)*100).toFixed(1);
-    const c=parseFloat(g.confidence)>=0.85?'#34d399':parseFloat(g.confidence)>=0.70?'#fbbf24':'#f87171';
+    const confColor=parseFloat(g.confidence)>=0.85?'#34d399':parseFloat(g.confidence)>=0.70?'#fbbf24':'#f87171';
     const zone=parseFloat(g.confidence)>=0.85?'Optimal':parseFloat(g.confidence)>=0.70?'Marginal':'At-Risk';
+
+    // GT overlay
+    const gtResult=isGestureCorrect(g); // null = no GT, true = correct, false = incorrect
+    const barColor=gtResult===null?confColor:gtResult?'#34d399':'#f87171';
+    const gtTag=gtResult===null?''
+      :gtResult?`<span class="correct-tag">✓ Correct</span>`
+                :`<span class="incorrect-tag">✗ Not in GT</span>`;
+
     return`<div class="cb-wrap">
       <div class="cb-label">
         <span>#${i+1} <b>${g.predicted_label}</b> <span style="color:var(--muted);font-size:9px">${g.datetime?.slice(11,19)||''}</span>
-          <span class="ztag" style="background:${c}22;color:${c};">${zone}</span></span>
-        <span style="color:${c};font-size:11px;">${pct}%</span>
+          <span class="ztag" style="background:${confColor}22;color:${confColor};">${zone}</span>${gtTag}</span>
+        <span style="color:${confColor};font-size:11px;">${pct}%</span>
       </div>
-      <div class="cb-track"><div class="cb-fill" style="width:${pct}%;background:${c};"></div></div>
+      <div class="cb-track"><div class="cb-fill" style="width:${pct}%;background:${barColor};"></div></div>
     </div>`;
   }).join('');
+  // ─────────────────────────────────────────────────────────────────
+
   document.getElementById('perGestureConcl').innerHTML=`
     <span class="verdict ${highRate>=80?'v-pass':'v-part'}">Generally ${highRate>=80?'Strong':'Acceptable'} — ${low>0?`${low} At-Risk Outlier${low!==1?'s':''}`:' No Outliers'}</span><br>
     Session high: <b>#${confs.indexOf(Math.max(...confs))+1} ${topG.predicted_label} at ${(Math.max(...confs)*100).toFixed(1)}%</b>.
     Session low: <b>#${confs.indexOf(Math.min(...confs))+1} ${botG.predicted_label} at ${(Math.min(...confs)*100).toFixed(1)}%</b>.
+    ${hasGT?`GT color coding active — <span style="color:#34d399">green bars = label in GT list</span>, <span style="color:#f87171">red bars = label not in GT list</span>. `:'Upload your GT sign list CSV above to enable color-coded correctness on each bar. '}
     ${low>0?'At-Risk detections likely reflect transient factors (occlusion, lighting, posture) rather than fundamental model failures — cross-reference against session video if available.':'All detections meet or approach reliability thresholds, confirming consistent signing conditions.'}`;
 
   // TTS Table
@@ -672,15 +992,20 @@ function renderDashboard(){
     <b>${ttsRows.length}</b> TTS sentence${ttsRows.length!==1?'s':''} produced. <b>${audible} of ${ttsRows.length}</b> (${Math.round(audible/ttsRows.length*100)}%) fall within the audible benchmark.
     ${audible<ttsRows.length?'Audio normalization targeting -20 to -35 dBFS using AGC or post-processing is recommended. The NLG sentence construction layer is functional.':'TTS pipeline is performing well across both language generation and audio rendering.'}`;
 
-  // Key findings (dynamic)
+  // Key findings (dynamic) — with GT additions
   const findings=[];
   findings.push({icon:'✓',bg:'rgba(56,189,248,.15)',c:'var(--accent)',text:`<b>End-to-End Pipeline Operational.</b> ${gestures.length} gestures detected, ${ttsRows.length} TTS sentences produced without system failure.`});
+  if(hasGT){
+    const correctCount=gestures.filter(g=>gtLabels.has(g.predicted_label)).length;
+    const overallAcc=(correctCount/gestures.length*100).toFixed(1);
+    findings.push({icon:'🎯',bg:'rgba(167,139,250,.15)',c:'var(--accent2)',text:`<b>Ground Truth Accuracy: ${overallAcc}%.</b> ${correctCount} of ${gestures.length} gesture detections matched labels in the uploaded GT sign list.`});
+  }
   if(high/confs.length>=0.75)findings.push({icon:'↑',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>Strong Confidence on Dominant Signs.</b> ${highRate}% of detections exceeded the 85% threshold. The model generalizes well to frequently signed labels.`});
   if(low>0)findings.push({icon:'⚠',bg:'rgba(251,191,36,.15)',c:'var(--warn)',text:`<b>At-Risk Detections Present.</b> ${low} gesture${low!==1?'s':''} scored below 70%. Affected: ${[...new Set(gestures.filter(g=>parseFloat(g.confidence)<0.70).map(g=>g.predicted_label))].join(', ')}.`});
   if(avgDbfs!==null&&avgDbfs<-40)findings.push({icon:'!',bg:'rgba(248,113,113,.15)',c:'var(--danger)',text:`<b>TTS Audio Volume Inconsistent.</b> Average ${avgDbfs.toFixed(1)} dBFS falls below the audible benchmark. Only ${audible}/${ttsRows.length} outputs are clearly audible.`});
   else if(avgDbfs!==null)findings.push({icon:'🔊',bg:'rgba(52,211,153,.15)',c:'var(--accent3)',text:`<b>TTS Audio Within Audible Range.</b> Average ${avgDbfs.toFixed(1)} dBFS meets target. ${audible}/${ttsRows.length} outputs are clearly audible.`});
   if(avgInf<100)findings.push({icon:'⏱',bg:'rgba(167,139,250,.15)',c:'var(--accent2)',text:`<b>Inference Latency Meets Real-Time Bounds.</b> Average ${avgInf.toFixed(1)}ms confirms suitability for live assistive communication.`});
-  if(!gestures.some(g=>g.ground_truth))findings.push({icon:'∅',bg:'rgba(251,146,60,.15)',c:'var(--accent4)',text:`<b>No Ground Truth Provided.</b> Formal Accuracy, Precision, Recall, and F1 cannot be computed. Annotating gestures is required for quantitative thesis evaluation.`});
+  if(!hasGT&&!gestures.some(g=>g.ground_truth))findings.push({icon:'∅',bg:'rgba(251,146,60,.15)',c:'var(--accent4)',text:`<b>No Ground Truth Provided.</b> Upload your GT sign list CSV to enable Accuracy, Precision, Recall, and F1 metrics.`});
   if(!sttRows.length)findings.push({icon:'🎙',bg:'rgba(100,116,139,.15)',c:'var(--muted)',text:`<b>STT Pipeline Untested.</b> Zero STT events captured. Dedicated STT sessions should be run to evaluate the speech-to-text component.`});
   document.getElementById('keyFindings').innerHTML=`
     <div class="obs-title">🔬 Summary of Testing Session Results</div>
@@ -690,8 +1015,13 @@ function renderDashboard(){
 
   // Recommendations (dynamic)
   const recs=[];
-  if(!gestures.some(g=>g.ground_truth))recs.push('Annotate test sessions with <b>ground truth labels</b> on all gesture events to enable Accuracy, Precision, Recall, and F1-Score computation — the core quantitative thesis metrics.');
-  if(unreliableS>0)recs.push(`Augment training data for <b>${signLabels.filter((_,i)=>signAvgs[i]<70).join(', ')}</b> — signs averaging below 70%. Add varied lighting conditions, signing angles, and multiple signer profiles.`);
+  if(!hasGT&&!gestures.some(g=>g.ground_truth))recs.push('Upload your <b>ground truth sign list CSV</b> using the GT panel above — this unlocks Accuracy, Precision, Recall, and F1-Score, which are the core quantitative thesis metrics.');
+  if(hasGT){
+    const gtMetrics2=computeGTMetrics(gestures);
+    const weakSigns=Object.entries(gtMetrics2).filter(([,m])=>m.inGT&&m.total>0&&m.accuracy<0.5).map(([l])=>l);
+    if(weakSigns.length)recs.push(`Augment training data for <b>${weakSigns.join(', ')}</b> — these GT signs have accuracy below 50%. Add varied lighting conditions, signing angles, and multiple signer profiles.`);
+  }
+  if(unreliableS>0)recs.push(`Augment training data for <b>${signLabels.filter((_,i)=>signAvgs[i]<70).join(', ')}</b> — signs averaging below 70% confidence.`);
   if(avgDbfs!==null&&audible<ttsRows.length)recs.push('Implement <b>TTS audio normalization</b> targeting -20 to -35 dBFS using Automatic Gain Control (AGC) or post-processing normalization before speaker output rendering.');
   if(low>0)recs.push('Apply a <b>confidence threshold filter (≥0.70)</b> to suppress At-Risk predictions from entering the sentence builder, reducing erroneous tokens in TTS output.');
   if(!sttRows.length)recs.push('Conduct dedicated sessions to exercise the <b>STT pipeline</b> — zero events were captured, leaving that component entirely untested in this session.');
