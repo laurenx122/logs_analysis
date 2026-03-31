@@ -163,7 +163,7 @@ footer span{color:var(--accent);}
     <span class="gt-icon">🎯</span>
     <div>
       <div class="gt-title">Ground Truth Sign List (Optional)</div>
-      <div class="gt-sub">Upload your gesture list CSV with columns <code>index, label, category</code> — enables Accuracy, Precision, Recall &amp; F1 per sign</div>
+      <div class="gt-sub">Upload your gesture list CSV — works with or without a header row. Your format (0, Hello, POLITENESS) is auto-detected — no changes needed</div>
     </div>
   </div>
   <div id="gtStatus" class="gt-status empty">⊘ No ground truth loaded — label-match accuracy disabled</div>
@@ -434,22 +434,47 @@ gtDropZone.addEventListener('drop',e=>{
 function loadGT(file){
   const reader=new FileReader();
   reader.onload=e=>{
-    const rows=parseCSV(e.target.result);
+    const raw=e.target.result.trim();
     gtLabels=new Set();
-    // Support columns: label, name, sign, word, gesture (flexible)
-    rows.forEach(r=>{
-      const lbl=(r.label||r.name||r.sign||r.word||r.gesture||'').trim();
-      if(lbl)gtLabels.add(lbl);
+
+    // Parse raw lines (handle \r\n and \n)
+    const lines=raw.split(/\r?\n/).filter(l=>l.trim()!=='');
+
+    // Detect if first row is a header by checking whether any cell in row 0
+    // looks like a known header keyword (non-numeric, non-sign-word)
+    const headerKeywords=/^(index|id|label|name|sign|word|gesture|category|class|no|num|#)$/i;
+    const firstCells=lines[0].split(',').map(c=>c.trim());
+    const hasHeader=firstCells.some(c=>headerKeywords.test(c));
+
+    const dataLines=hasHeader?lines.slice(1):lines;
+
+    // For each data line: split by comma, find the column that looks like a sign label.
+    // Strategy: column 0 is usually the index (numeric), column 1 is label (text), column 2 is category.
+    // We pick the first non-numeric, non-empty cell — that's the label.
+    dataLines.forEach(line=>{
+      const cells=line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+      // If header existed, try named columns first
+      if(hasHeader){
+        const headers=firstCells.map(h=>h.toLowerCase());
+        const lblIdx=headers.findIndex(h=>/(label|name|sign|word|gesture)/.test(h));
+        if(lblIdx>=0&&cells[lblIdx]){gtLabels.add(cells[lblIdx]);return;}
+      }
+      // Headerless fallback: skip numeric cells, take first text cell as label
+      for(let i=0;i<cells.length;i++){
+        const c=cells[i];
+        if(c&&isNaN(c)&&c.length>0){gtLabels.add(c);break;}
+      }
     });
+
     const statusEl=document.getElementById('gtStatus');
     const pillsEl=document.getElementById('gtPills');
     if(gtLabels.size>0){
       statusEl.className='gt-status loaded';
-      statusEl.textContent=`✓ ${gtLabels.size} ground truth signs loaded from "${file.name}"`;
+      statusEl.textContent=`✓ ${gtLabels.size} ground truth signs loaded from "${file.name}" (${hasHeader?'header detected':'no header — auto-detected label column'})`;
       pillsEl.innerHTML=[...gtLabels].map(l=>`<span class="gt-pill">${l}</span>`).join('');
     }else{
       statusEl.className='gt-status empty';
-      statusEl.textContent='⚠ Could not parse labels — ensure column is named "label"';
+      statusEl.textContent='⚠ Could not parse any labels — check that column B contains sign names like "Hello", "Please", etc.';
       pillsEl.innerHTML='';
     }
     renderDashboard();
